@@ -10,8 +10,7 @@ import {
   Activity,
   Stethoscope,
   RotateCcw,
-  Eye,
-  X,
+  Heart,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -20,17 +19,23 @@ function MobileTabButton({
   label,
   active,
   onClick,
+  variant = 'default',
 }: {
   icon: React.ComponentType<any>;
   label: string;
   active: boolean;
   onClick: () => void;
+  variant?: 'default' | 'muscle';
 }) {
+  const activeClass = variant === 'muscle'
+    ? 'text-red-400 bg-red-400/10'
+    : 'text-cyan-400 bg-cyan-400/10';
+
   return (
     <button
       onClick={onClick}
-      className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all ${
-        active ? 'text-cyan-400 bg-cyan-400/10' : 'text-slate-500'
+      className={`flex flex-col items-center gap-0.5 px-2.5 py-1.5 rounded-lg transition-all ${
+        active ? activeClass : 'text-slate-500'
       }`}
     >
       <Icon size={18} strokeWidth={1.5} />
@@ -45,7 +50,8 @@ export default function MobileNav() {
   const activeTab = useAppStore((s) => s.activeTab);
   const setActiveTab = useAppStore((s) => s.setActiveTab);
   const resetView = useAppStore((s) => s.resetView);
-  const showAllRegions = useAppStore((s) => s.showAllRegions);
+  const muscleMode = useAppStore((s) => s.muscleMode);
+  const toggleMuscleMode = useAppStore((s) => s.toggleMuscleMode);
 
   const handleTabClick = (tab: 'hierarchy' | 'info' | 'motion' | 'pathology') => {
     if (activeTab === tab && sidebarOpen) {
@@ -60,7 +66,7 @@ export default function MobileNav() {
     <>
       {/* Mobile bottom nav - only visible on small screens */}
       <div className="sm:hidden absolute bottom-0 left-0 right-0 z-40 glass-strong border-t border-white/5">
-        <div className="flex items-center justify-around px-2 py-1 safe-area-bottom">
+        <div className="flex items-center justify-around px-1 py-1 safe-area-bottom">
           <MobileTabButton
             icon={Layers}
             label="层级"
@@ -85,19 +91,19 @@ export default function MobileNav() {
             active={activeTab === 'pathology' && sidebarOpen}
             onClick={() => handleTabClick('pathology')}
           />
+          <MobileTabButton
+            icon={Heart}
+            label="肌肉"
+            active={muscleMode}
+            onClick={toggleMuscleMode}
+            variant="muscle"
+          />
           <button
             onClick={resetView}
-            className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-slate-500"
+            className="flex flex-col items-center gap-0.5 px-2.5 py-1.5 rounded-lg text-slate-500"
           >
             <RotateCcw size={18} strokeWidth={1.5} />
             <span className="text-[9px] font-mono">重置</span>
-          </button>
-          <button
-            onClick={showAllRegions}
-            className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-slate-500"
-          >
-            <Eye size={18} strokeWidth={1.5} />
-            <span className="text-[9px] font-mono">全部</span>
           </button>
         </div>
       </div>

@@ -32,6 +32,13 @@ interface AppState {
   visibleRegions: Set<string>;
   hiddenBones: Set<string>;
 
+  // Display Modes
+  muscleMode: boolean;
+  muscleOpacity: number;
+
+  // Pathology Visualization
+  activePathologyIndex: number | null; // Index in BONE_PATHOLOGIES[selectedBoneId]
+
   // UI State
   sidebarOpen: boolean;
   infoPanelOpen: boolean;
@@ -57,6 +64,13 @@ interface AppState {
   setCameraTarget: (target: [number, number, number] | null) => void;
   setCameraPreset: (position: [number, number, number], target: [number, number, number]) => void;
   resetView: () => void;
+
+  // Muscle mode
+  toggleMuscleMode: () => void;
+  setMuscleOpacity: (opacity: number) => void;
+
+  // Pathology visualization
+  setActivePathology: (index: number | null) => void;
 }
 
 const ALL_REGIONS = new Set([
@@ -70,6 +84,9 @@ export const useAppStore = create<AppState>((set) => ({
   lockedRegionId: null,
   visibleRegions: new Set(ALL_REGIONS),
   hiddenBones: new Set<string>(),
+  muscleMode: false,
+  muscleOpacity: 0.55,
+  activePathologyIndex: null,
   sidebarOpen: true,
   infoPanelOpen: false,
   searchQuery: '',
@@ -82,6 +99,7 @@ export const useAppStore = create<AppState>((set) => ({
     selectedBoneId: id,
     infoPanelOpen: id !== null,
     activeTab: id !== null ? 'info' : state.activeTab,
+    activePathologyIndex: null, // Reset pathology when selecting new bone
   })),
 
   hoverBone: (id) => set({ hoveredBoneId: id }),
@@ -120,6 +138,10 @@ export const useAppStore = create<AppState>((set) => ({
   setCameraTarget: (target) => set({ cameraTarget: target }),
   setCameraPreset: (position, target) => set({ cameraPosition: position, cameraTarget: target }),
 
+  toggleMuscleMode: () => set((state) => ({ muscleMode: !state.muscleMode })),
+  setMuscleOpacity: (opacity) => set({ muscleOpacity: opacity }),
+  setActivePathology: (index) => set({ activePathologyIndex: index }),
+
   resetView: () => set({
     selectedBoneId: null,
     hoveredBoneId: null,
@@ -130,5 +152,7 @@ export const useAppStore = create<AppState>((set) => ({
     cameraTarget: null,
     cameraPosition: null,
     infoPanelOpen: false,
+    muscleMode: false,
+    activePathologyIndex: null,
   }),
 }));

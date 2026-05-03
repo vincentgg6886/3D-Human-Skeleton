@@ -1,13 +1,13 @@
 /*
- * SkeletonScene.tsx - Main 3D scene with real anatomical skeleton from GLB model
+ * SkeletonScene.tsx - Main 3D scene with real anatomical skeleton + muscle overlay + pathology effects
  * Design: Deep space gray environment with cool blue rim lighting
  * Model: AnatomyTOOL medical-grade skeleton (147 bones, mirrored for left side)
+ *        + upper-limb muscles (44) + lower-limb muscles (53)
  * 
  * Model coordinate system:
  *   - Units: meters (total height ~1.55m)
  *   - Y-axis: up (0 = feet, 1.55 = top of skull)
  *   - X-axis: right side is negative X (anatomical convention)
- *   - No parent transforms on nodes - all positions are world-space
  */
 
 import { useRef, useEffect, useMemo, useCallback } from 'react';
@@ -16,19 +16,19 @@ import { OrbitControls, Grid, Html, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { GLB_NODE_TO_BONE, APP_BONE_LOOKUP } from '@/lib/boneMapping';
 import { useAppStore } from '@/lib/store';
+import { BONE_PATHOLOGIES } from '@/lib/pathologyData';
+import { getPathologyEffect } from '@/lib/pathologyEffects';
+import { isMuscleNode, getMuscleGroup, MUSCLE_GROUP_COLORS } from '@/lib/muscleFilter';
 
-const MODEL_URL = '/manus-storage/overview-skeleton_8b0752cc.glb';
+const SKELETON_URL = '/manus-storage/overview-skeleton_8b0752cc.glb';
+const UPPER_LIMB_URL = '/manus-storage/upper-limb_1ff7cbc0.glb';
+const LOWER_LIMB_URL = '/manus-storage/lower-limb_931f932f.glb';
 
 // Model bounding box: X[-0.34, 0.07], Y[0.009, 1.71], Z[-0.12, 0.14]
-// Model height = 1.70m, center at Y=0.857, X center at -0.13 (right side only)
-// We want the skeleton to be ~8 scene units tall
 const MODEL_SCALE = 4.7;
-// Offset to center model at origin X=0 and feet at Y=0
-// Model center X = -0.13, so offset = 0.13 * scale = 0.61
-// Model min Y = 0.009, so offset = -0.009 * scale ≈ 0
-const MODEL_OFFSET_X = 0.13 * MODEL_SCALE; // shift right to center
-const MODEL_OFFSET_Y = -0.009 * MODEL_SCALE; // align feet to ground
-const MODEL_OFFSET_Z = -0.01 * MODEL_SCALE; // center Z
+const MODEL_OFFSET_X = 0.13 * MODEL_SCALE;
+const MODEL_OFFSET_Y = -0.009 * MODEL_SCALE;
+const MODEL_OFFSET_Z = -0.01 * MODEL_SCALE;
 
 // ============================================================
 // Region color palette
@@ -60,7 +60,7 @@ interface InteractiveBoneProps {
   isMirror: boolean;
 }
 
-function InteractiveBone({ geometry, appBoneId, region, position, isMirror }: InteractiveBoneProps) {
+function InteractiveBone({ geometry, appBoneId, region, isMirror }: InteractiveBoneProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const glowTime = useRef(0);
 
@@ -69,6 +69,8 @@ function InteractiveBone({ geometry, appBoneId, region, position, isMirror }: In
   const visibleRegions = useAppStore((s) => s.visibleRegions);
   const hiddenBones = useAppStore((s) => s.hiddenBones);
   const lockedRegionId = useAppStore((s) => s.lockedRegionId);
+  const muscleMode = useAppStore((s) => s.muscleMode);
+  const activePathologyIndex = useAppStore((s) => s.activePathologyIndex);
   const selectBone = useAppStore((s) => s.selectBone);
   const hoverBone = useAppStore((s) => s.hoverBone);
 
@@ -76,6 +78,14 @@ function InteractiveBone({ geometry, appBoneId, region, position, isMirror }: In
   const isHovered = hoveredBoneId === appBoneId;
   const isVisible = visibleRegions.has(region) && !hiddenBones.has(appBoneId);
   const isDimmed = lockedRegionId !== null && lockedRegionId !== region;
+
+  // Check if this bone has an active pathology effect
+  const pathologyEffect = useMemo(() => {
+    if (activePathologyIndex === null || selectedBoneId !== appBoneId) return null;
+    const pathologies = BONE_PATHOLOGIES[appBoneId];
+    if (!pathologies || !pathologies[activePathologyIndex]) return null;
+    return getPathologyEffect(pathologies[activePathologyIndex].name);
+  }, [activePathologyIndex, selectedBoneId, appBoneId]);
 
   const baseColor = useMemo(() => REGION_COLORS[region]?.clone() || new THREE.Color('#E8DCC8'), [region]);
 
@@ -95,6 +105,36 @@ function InteractiveBone({ geometry, appBoneId, region, position, isMirror }: In
   useFrame((_, delta) => {
     if (!meshRef.current) return;
     const mat = meshRef.current.material as THREE.MeshStandardMaterial;
+
+    // Pathology effect takes highest priority
+    if (pathologyEffect) {
+      glowTime.current += delta;
+      const pathColor = new THREE.Color(pathologyEffect.color);
+      const pathEmissive = new THREE.Color(pathologyEffect.emissiveColor);
+      const pulse = pathologyEffect.pulseSpeed > 0
+        ? 0.5 + 0.5 * Math.sin(glowTime.current * pathologyEffect.pulseSpeed)
+        : 1;
+
+      mat.color.lerp(pathColor, 0.12);
+      mat.emissive.lerp(pathEmissive, 0.12);
+      mat.emissiveIntensity = THREE.MathUtils.lerp(
+        mat.emissiveIntensity,
+        pathologyEffect.emissiveIntensity * (0.6 + 0.4 * pulse),
+        0.1
+      );
+      mat.opacity = THREE.MathUtils.lerp(mat.opacity, pathologyEffect.opacity, 0.1);
+      mat.roughness = THREE.MathUtils.lerp(mat.roughness, pathologyEffect.roughness, 0.05);
+      return;
+    }
+
+    // Muscle mode: make bones slightly transparent
+    if (muscleMode && !isSelected) {
+      mat.color.lerp(baseColor, 0.08);
+      mat.opacity = THREE.MathUtils.lerp(mat.opacity, 0.4, 0.06);
+      mat.emissive.lerp(DEFAULT_EMISSIVE, 0.1);
+      mat.emissiveIntensity = THREE.MathUtils.lerp(mat.emissiveIntensity, 0, 0.1);
+      return;
+    }
 
     if (isDimmed) {
       mat.color.lerp(DIMMED_COLOR, 0.1);
@@ -141,16 +181,13 @@ function InteractiveBone({ geometry, appBoneId, region, position, isMirror }: In
 
   if (!isVisible) return null;
 
-  // For mirrored bones, we flip X scale and shift position to mirror around model center
-  // Original bones: position at offset, scale normally
-  // Mirrored bones: flip X, position shifted to mirror around MODEL_OFFSET_X
   const meshPosition: [number, number, number] = isMirror
-    ? [2 * MODEL_OFFSET_X, MODEL_OFFSET_Y, MODEL_OFFSET_Z]  // Mirror position
-    : [MODEL_OFFSET_X, MODEL_OFFSET_Y, MODEL_OFFSET_Z];     // Normal position
+    ? [2 * MODEL_OFFSET_X, MODEL_OFFSET_Y, MODEL_OFFSET_Z]
+    : [MODEL_OFFSET_X, MODEL_OFFSET_Y, MODEL_OFFSET_Z];
   
   const meshScale: [number, number, number] = isMirror
-    ? [-MODEL_SCALE, MODEL_SCALE, MODEL_SCALE]   // Flip X for mirror
-    : [MODEL_SCALE, MODEL_SCALE, MODEL_SCALE];   // Normal scale
+    ? [-MODEL_SCALE, MODEL_SCALE, MODEL_SCALE]
+    : [MODEL_SCALE, MODEL_SCALE, MODEL_SCALE];
 
   return (
     <mesh
@@ -169,16 +206,82 @@ function InteractiveBone({ geometry, appBoneId, region, position, isMirror }: In
 }
 
 // ============================================================
+// Muscle Mesh - Semi-transparent muscle overlay
+// ============================================================
+interface MuscleMeshProps {
+  geometry: THREE.BufferGeometry;
+  groupColor: string;
+  isMirror: boolean;
+}
+
+function MuscleMesh({ geometry, groupColor, isMirror }: MuscleMeshProps) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const muscleMode = useAppStore((s) => s.muscleMode);
+  const muscleOpacity = useAppStore((s) => s.muscleOpacity);
+  const fadeRef = useRef(0);
+
+  const material = useMemo(() => {
+    return new THREE.MeshStandardMaterial({
+      color: new THREE.Color(groupColor),
+      roughness: 0.35,
+      metalness: 0.05,
+      emissive: new THREE.Color(groupColor),
+      emissiveIntensity: 0.08,
+      transparent: true,
+      opacity: 0,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+  }, [groupColor]);
+
+  useFrame((_, delta) => {
+    if (!meshRef.current) return;
+    const mat = meshRef.current.material as THREE.MeshStandardMaterial;
+    const targetOpacity = muscleMode ? muscleOpacity : 0;
+    fadeRef.current = THREE.MathUtils.lerp(fadeRef.current, targetOpacity, 0.06);
+    mat.opacity = fadeRef.current;
+    meshRef.current.visible = fadeRef.current > 0.01;
+  });
+
+  const meshPosition: [number, number, number] = isMirror
+    ? [2 * MODEL_OFFSET_X, MODEL_OFFSET_Y, MODEL_OFFSET_Z]
+    : [MODEL_OFFSET_X, MODEL_OFFSET_Y, MODEL_OFFSET_Z];
+  
+  const meshScale: [number, number, number] = isMirror
+    ? [-MODEL_SCALE, MODEL_SCALE, MODEL_SCALE]
+    : [MODEL_SCALE, MODEL_SCALE, MODEL_SCALE];
+
+  return (
+    <mesh
+      ref={meshRef}
+      geometry={geometry}
+      material={material}
+      position={meshPosition}
+      scale={meshScale}
+      visible={false}
+      renderOrder={1}
+    />
+  );
+}
+
+// ============================================================
 // Floating label for selected bone
 // ============================================================
 function BoneLabel() {
   const selectedBoneId = useAppStore((s) => s.selectedBoneId);
+  const activePathologyIndex = useAppStore((s) => s.activePathologyIndex);
   const boneEntry = selectedBoneId ? APP_BONE_LOOKUP[selectedBoneId] : null;
 
   if (!boneEntry || !selectedBoneId) return null;
 
   const pos = (window as any).__bonePositions?.[selectedBoneId];
   if (!pos) return null;
+
+  // Get active pathology info if any
+  const pathologies = BONE_PATHOLOGIES[selectedBoneId];
+  const activePathology = activePathologyIndex !== null && pathologies
+    ? pathologies[activePathologyIndex]
+    : null;
 
   return (
     <Html
@@ -190,6 +293,11 @@ function BoneLabel() {
       <div className="px-2.5 py-1 rounded-md bg-black/80 backdrop-blur-sm border border-cyan-400/30 whitespace-nowrap">
         <div className="text-[11px] font-medium text-cyan-300">{boneEntry.nameCn}</div>
         <div className="text-[9px] font-mono text-cyan-400/60">{boneEntry.nameEn}</div>
+        {activePathology && (
+          <div className="text-[10px] font-medium text-red-400 mt-0.5 border-t border-red-400/20 pt-0.5">
+            {activePathology.nameCn}
+          </div>
+        )}
       </div>
     </Html>
   );
@@ -198,19 +306,15 @@ function BoneLabel() {
 // ============================================================
 // GLB Skeleton Loader
 // ============================================================
-// Three.js GLB loader sanitizes node names: spaces → underscores, dots removed
-// Build a lookup that maps sanitized names back to original GLB names
 const SANITIZED_LOOKUP: Record<string, string> = {};
 for (const originalName of Object.keys(GLB_NODE_TO_BONE)) {
-  // Replicate Three.js sanitization: replace spaces with _, remove dots
   const sanitized = originalName.replace(/\s/g, '_').replace(/\./g, '');
   SANITIZED_LOOKUP[sanitized] = originalName;
 }
 
 function SkeletonModel() {
-  const { scene } = useGLTF(MODEL_URL);
+  const { scene } = useGLTF(SKELETON_URL);
 
-  // Parse the GLB scene and extract interactive bones
   const bones = useMemo(() => {
     const result: { geometry: THREE.BufferGeometry; appBoneId: string; region: string; isMirror: boolean; center: [number, number, number] }[] = [];
     const bonePositions: Record<string, [number, number, number]> = {};
@@ -218,7 +322,6 @@ function SkeletonModel() {
     scene.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;
       const nodeName = child.name;
-      // Try direct match first, then sanitized lookup
       const originalName = SANITIZED_LOOKUP[nodeName] || nodeName;
       const mapping = GLB_NODE_TO_BONE[originalName];
       if (!mapping) return;
@@ -228,14 +331,12 @@ function SkeletonModel() {
       const center = new THREE.Vector3();
       geo.boundingBox!.getCenter(center);
 
-      // Scale center to scene coordinates and apply offset
       const scaledCenter: [number, number, number] = [
         center.x * MODEL_SCALE + MODEL_OFFSET_X,
         center.y * MODEL_SCALE + MODEL_OFFSET_Y,
         center.z * MODEL_SCALE + MODEL_OFFSET_Z,
       ];
 
-      // Right-side bone (original)
       result.push({
         geometry: geo,
         appBoneId: mapping.appBoneId,
@@ -245,10 +346,8 @@ function SkeletonModel() {
       });
       bonePositions[mapping.appBoneId] = scaledCenter;
 
-      // Create mirrored left-side bone (mirror around X=MODEL_OFFSET_X)
       if (mapping.mirror && mapping.mirrorAppBoneId) {
         const leftRegion = mapping.region.replace('-right', '-left');
-        // Mirror X around the offset center: mirroredX = 2*offsetX - scaledX
         const mirroredCenter: [number, number, number] = [
           2 * MODEL_OFFSET_X - scaledCenter[0],
           scaledCenter[1],
@@ -265,9 +364,7 @@ function SkeletonModel() {
       }
     });
 
-    // Store positions globally for label and camera access
     (window as any).__bonePositions = bonePositions;
-
     return result;
   }, [scene]);
 
@@ -289,6 +386,59 @@ function SkeletonModel() {
 }
 
 // ============================================================
+// Muscle Overlay Loader - loads upper-limb and lower-limb GLB
+// ============================================================
+function MuscleOverlay() {
+  const { scene: upperScene } = useGLTF(UPPER_LIMB_URL);
+  const { scene: lowerScene } = useGLTF(LOWER_LIMB_URL);
+
+  const muscles = useMemo(() => {
+    const result: { geometry: THREE.BufferGeometry; groupColor: string; isMirror: boolean; nodeName: string }[] = [];
+
+    const processScene = (scene: THREE.Group) => {
+      scene.traverse((child) => {
+        if (!(child instanceof THREE.Mesh)) return;
+        const rawName = child.name;
+        // Reverse Three.js sanitization
+        const originalName = rawName.replace(/_/g, ' ');
+        
+        if (!isMuscleNode(originalName)) return;
+
+        const group = getMuscleGroup(originalName);
+        const color = MUSCLE_GROUP_COLORS[group];
+        const geo = child.geometry;
+
+        // Right side (original)
+        result.push({ geometry: geo, groupColor: color, isMirror: false, nodeName: originalName });
+        
+        // Mirror for left side if node name ends with .r or .r (sanitized)
+        if (rawName.endsWith('r') || originalName.endsWith('.r') || originalName.endsWith('.r.')) {
+          result.push({ geometry: geo, groupColor: color, isMirror: true, nodeName: originalName + '_L' });
+        }
+      });
+    };
+
+    processScene(upperScene);
+    processScene(lowerScene);
+
+    return result;
+  }, [upperScene, lowerScene]);
+
+  return (
+    <group>
+      {muscles.map(({ geometry, groupColor, isMirror, nodeName }, i) => (
+        <MuscleMesh
+          key={`${nodeName}-${i}`}
+          geometry={geometry}
+          groupColor={groupColor}
+          isMirror={isMirror}
+        />
+      ))}
+    </group>
+  );
+}
+
+// ============================================================
 // Camera Controller with smooth transitions
 // ============================================================
 function CameraController() {
@@ -300,7 +450,6 @@ function CameraController() {
   const lockedRegionId = useAppStore((s) => s.lockedRegionId);
   const animRef = useRef<number>(0);
 
-  // Handle camera preset (both position and target)
   useEffect(() => {
     if (!controlsRef.current || !cameraPosition || !cameraTarget) return;
     if (animRef.current) cancelAnimationFrame(animRef.current);
@@ -331,7 +480,6 @@ function CameraController() {
     return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
   }, [cameraPosition, cameraTarget, camera]);
 
-  // Handle camera target only (focus on bone/region)
   useEffect(() => {
     if (!controlsRef.current || !cameraTarget || cameraPosition) return;
     if (animRef.current) cancelAnimationFrame(animRef.current);
@@ -365,7 +513,6 @@ function CameraController() {
     return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
   }, [cameraTarget, camera]);
 
-  // Auto-focus on selected bone
   useEffect(() => {
     if (!selectedBoneId || !controlsRef.current) return;
     const pos = (window as any).__bonePositions?.[selectedBoneId];
@@ -374,7 +521,6 @@ function CameraController() {
     }
   }, [selectedBoneId]);
 
-  // Auto-focus on locked region
   useEffect(() => {
     if (!lockedRegionId || !controlsRef.current) return;
     const positions = (window as any).__bonePositions;
@@ -476,6 +622,7 @@ export default function SkeletonScene() {
         <SceneLighting />
         <CameraController />
         <SkeletonModel />
+        <MuscleOverlay />
         <FloorGrid />
         <fog attach="fog" args={['#0A0E17', 12, 30]} />
       </Canvas>
@@ -483,5 +630,7 @@ export default function SkeletonScene() {
   );
 }
 
-// Preload the GLB model
-useGLTF.preload(MODEL_URL);
+// Preload all GLB models
+useGLTF.preload(SKELETON_URL);
+useGLTF.preload(UPPER_LIMB_URL);
+useGLTF.preload(LOWER_LIMB_URL);

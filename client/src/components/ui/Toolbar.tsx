@@ -16,7 +16,7 @@ import {
   Stethoscope,
   ChevronLeft,
   ChevronRight,
-  Maximize2,
+  Heart,
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -31,16 +31,18 @@ function ToolButton({
   label: string;
   onClick: () => void;
   active?: boolean;
-  variant?: 'default' | 'accent' | 'danger';
+  variant?: 'default' | 'accent' | 'danger' | 'muscle';
 }) {
   const colorClass =
     variant === 'accent'
       ? 'text-cyan-400 bg-cyan-400/10'
       : variant === 'danger'
         ? 'text-amber-400 bg-amber-400/10'
-        : active
-          ? 'text-cyan-400 bg-cyan-400/10'
-          : 'text-slate-400 hover:text-slate-200 hover:bg-white/5';
+        : variant === 'muscle'
+          ? 'text-red-400 bg-red-400/10'
+          : active
+            ? 'text-cyan-400 bg-cyan-400/10'
+            : 'text-slate-400 hover:text-slate-200 hover:bg-white/5';
 
   return (
     <Tooltip>
@@ -68,6 +70,8 @@ export default function Toolbar() {
   const lockRegion = useAppStore((s) => s.lockRegion);
   const resetView = useAppStore((s) => s.resetView);
   const showAllRegions = useAppStore((s) => s.showAllRegions);
+  const muscleMode = useAppStore((s) => s.muscleMode);
+  const toggleMuscleMode = useAppStore((s) => s.toggleMuscleMode);
 
   return (
     <div className="absolute left-0 top-0 bottom-0 w-12 flex flex-col items-center py-3 z-30 glass-strong border-r border-white/5">
@@ -116,6 +120,20 @@ export default function Toolbar() {
             setSidebarOpen(true);
           }}
           active={activeTab === 'pathology' && sidebarOpen}
+        />
+      </div>
+
+      {/* Divider */}
+      <div className="w-6 h-px bg-white/10 my-3" />
+
+      {/* Display modes */}
+      <div className="flex flex-col gap-1">
+        <ToolButton
+          icon={Heart}
+          label={muscleMode ? '关闭肌肉层' : '显示肌肉层'}
+          onClick={toggleMuscleMode}
+          active={muscleMode}
+          variant={muscleMode ? 'muscle' : 'default'}
         />
       </div>
 
