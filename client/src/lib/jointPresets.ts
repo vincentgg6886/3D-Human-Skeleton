@@ -2,7 +2,6 @@
  * jointPresets.ts - Joint view presets for orthopedic clinical focus
  * 8 major joints with camera positions, related bones, and descriptions
  */
-
 import type { JointPreset } from './store';
 
 export const JOINT_PRESETS: JointPreset[] = [
@@ -46,7 +45,7 @@ export const JOINT_PRESETS: JointPreset[] = [
     id: 'hip-right',
     nameCn: '右髋关节',
     nameEn: 'Right Hip',
-    bones: ['ilium-right', 'femur-right'],
+    bones: ['hip-bone-right', 'femur-right'],
     cameraPosition: [4, 3.5, 4],
     cameraTarget: [1.5, 3.2, 0],
     description: '髋关节由股骨头与髋臼构成的球窝关节，承载体重并传递力量。是人体最大、最稳定的关节。',
@@ -55,7 +54,7 @@ export const JOINT_PRESETS: JointPreset[] = [
     id: 'hip-left',
     nameCn: '左髋关节',
     nameEn: 'Left Hip',
-    bones: ['ilium-left', 'femur-left'],
+    bones: ['hip-bone-left', 'femur-left'],
     cameraPosition: [-4, 3.5, 4],
     cameraTarget: [-1.5, 3.2, 0],
     description: '髋关节由股骨头与髋臼构成的球窝关节，承载体重并传递力量。是人体最大、最稳定的关节。',

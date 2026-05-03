@@ -236,7 +236,7 @@ export const BONE_PATHOLOGIES: Record<string, Pathology[]> = {
       descriptionCn: '关节内骨折，影响膝关节对线。',
     },
   ],
-  'foot-left': [
+  'calcaneus-left': [
     {
       name: 'Calcaneal Fracture', nameCn: '跟骨骨折',
       severity: 'severe',
@@ -257,7 +257,7 @@ export const BONE_PATHOLOGIES: Record<string, Pathology[]> = {
       descriptionCn: '足底筋膜炎症，导致足跟疼痛。晨起第一步痛为典型表现。',
     },
   ],
-  'foot-right': [
+  'calcaneus-right': [
     {
       name: 'Calcaneal Fracture', nameCn: '跟骨骨折',
       severity: 'severe',
@@ -271,7 +271,7 @@ export const BONE_PATHOLOGIES: Record<string, Pathology[]> = {
       descriptionCn: '踝部骨折。',
     },
   ],
-  'ilium-left': [
+  'hip-bone-left': [
     {
       name: 'Pelvic Fracture', nameCn: '骨盆骨折',
       severity: 'severe',
@@ -286,7 +286,7 @@ export const BONE_PATHOLOGIES: Record<string, Pathology[]> = {
       descriptionCn: '髋臼盂唇撕裂，导致髋痛和机械症状。',
     },
   ],
-  'ilium-right': [
+  'hip-bone-right': [
     {
       name: 'Pelvic Fracture', nameCn: '骨盆骨折',
       severity: 'severe',
@@ -294,7 +294,7 @@ export const BONE_PATHOLOGIES: Record<string, Pathology[]> = {
       descriptionCn: '高能量创伤。有危及生命的大出血风险。',
     },
   ],
-  'hand-left': [
+  'scaphoid-left': [
     {
       name: 'Scaphoid Fracture', nameCn: '舟骨骨折',
       severity: 'common',
@@ -309,7 +309,7 @@ export const BONE_PATHOLOGIES: Record<string, Pathology[]> = {
       descriptionCn: '第5掌骨颈骨折，因拳击动作引起。',
     },
   ],
-  'hand-right': [
+  'scaphoid-right': [
     {
       name: 'Scaphoid Fracture', nameCn: '舟骨骨折',
       severity: 'common',

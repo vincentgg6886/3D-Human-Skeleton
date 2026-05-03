@@ -7,7 +7,7 @@ import { useAppStore } from '@/lib/store';
 import { BONE_INFO, TOTAL_BONE_COUNT } from '@/lib/skeletonData';
 import { BONE_PATHOLOGIES } from '@/lib/pathologyData';
 import { JOINT_PRESET_MAP } from '@/lib/jointPresets';
-import { Crosshair, Lock, Eye, Heart, Tag, Bone, AlertTriangle } from 'lucide-react';
+import { Crosshair, Lock, Eye, Heart, Tag, Bone, AlertTriangle, Scan } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function TopHUD() {
@@ -17,7 +17,7 @@ export default function TopHUD() {
   const muscleMode = useAppStore((s) => s.muscleMode);
   const labelMode = useAppStore((s) => s.labelMode);
   const activeJointPreset = useAppStore((s) => s.activeJointPreset);
-  const modelLoaded = useAppStore((s) => s.modelLoaded);
+  const xrayMode = useAppStore((s) => s.xrayMode);
 
   const displayBoneId = selectedBoneId || hoveredBoneId;
   const info = displayBoneId ? BONE_INFO[displayBoneId] : null;
@@ -67,6 +67,12 @@ export default function TopHUD() {
               <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-400/10 border border-emerald-400/20">
                 <Tag size={10} className="text-emerald-400" />
                 <span className="text-[9px] text-emerald-300 font-medium hidden sm:inline">标注</span>
+              </div>
+            )}
+            {xrayMode && (
+              <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-blue-400/10 border border-blue-400/20">
+                <Scan size={10} className="text-blue-400" />
+                <span className="text-[9px] text-blue-300 font-medium hidden sm:inline">X光</span>
               </div>
             )}
             <div className="hidden sm:flex items-center gap-1 px-2 py-1 rounded-md bg-white/[0.03] border border-white/5">

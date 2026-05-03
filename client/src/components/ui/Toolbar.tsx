@@ -2,6 +2,7 @@
  * Toolbar.tsx - Left sidebar toolbar with labeled icons
  * V1.1: Icon + text labels (width 64px), grouped sections
  * V1.2: Refined visual hierarchy, active states with color coding
+ * V1.5: Added X-ray mode toggle
  */
 
 import { useAppStore } from '@/lib/store';
@@ -16,6 +17,7 @@ import {
   Bone,
   HelpCircle,
   Move3d,
+  Scan,
 } from 'lucide-react';
 
 interface ToolButtonProps {
@@ -23,7 +25,7 @@ interface ToolButtonProps {
   label: string;
   active?: boolean;
   onClick: () => void;
-  variant?: 'default' | 'muscle' | 'accent' | 'label';
+  variant?: 'default' | 'muscle' | 'accent' | 'label' | 'xray';
 }
 
 function ToolButton({ icon: Icon, label, active, onClick, variant = 'default' }: ToolButtonProps) {
@@ -43,6 +45,10 @@ function ToolButton({ icon: Icon, label, active, onClick, variant = 'default' }:
     label: {
       active: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/25',
       idle: 'text-slate-500 hover:text-emerald-300 hover:bg-emerald-400/5 border-transparent',
+    },
+    xray: {
+      active: 'text-blue-400 bg-blue-400/10 border-blue-400/25',
+      idle: 'text-slate-500 hover:text-blue-300 hover:bg-blue-400/5 border-transparent',
     },
   };
 
@@ -71,6 +77,8 @@ export default function Toolbar() {
   const toggleMuscleMode = useAppStore((s) => s.toggleMuscleMode);
   const labelMode = useAppStore((s) => s.labelMode);
   const toggleLabelMode = useAppStore((s) => s.toggleLabelMode);
+  const xrayMode = useAppStore((s) => s.xrayMode);
+  const toggleXrayMode = useAppStore((s) => s.toggleXrayMode);
   const setShowOnboarding = useAppStore((s) => s.setShowOnboarding);
 
   const handleTabClick = (tab: typeof activeTab) => {
@@ -149,6 +157,13 @@ export default function Toolbar() {
           active={muscleMode}
           onClick={toggleMuscleMode}
           variant="muscle"
+        />
+        <ToolButton
+          icon={Scan}
+          label="X光"
+          active={xrayMode}
+          onClick={toggleXrayMode}
+          variant="xray"
         />
         <ToolButton
           icon={Tag}
