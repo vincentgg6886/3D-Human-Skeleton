@@ -1,11 +1,16 @@
 /*
- * SkeletonScene.tsx - Main 3D scene with real anatomical skeleton
- * V1.5: Joint view highlighting, bone label annotations, X-ray mode
+ * SkeletonScene.tsx - Main 3D scene with real anatomical skeleton + muscle overlay + pathology effects
+ * Design: Deep space gray environment with cool blue rim lighting
  * Model: AnatomyTOOL medical-grade skeleton (147 bones, mirrored for left side)
  *        + upper-limb muscles (44) + lower-limb muscles (53)
+ * 
+ * Model coordinate system:
+ *   - Units: meters (total height ~1.55m)
+ *   - Y-axis: up (0 = feet, 1.55 = top of skull)
+ *   - X-axis: right side is negative X (anatomical convention)
  */
 
-import { useRef, useEffect, useMemo, useCallback, useState } from 'react';
+import { useRef, useEffect, useMemo, useCallback } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls, Grid, Html, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
@@ -14,19 +19,19 @@ import { useAppStore } from '@/lib/store';
 import { BONE_PATHOLOGIES } from '@/lib/pathologyData';
 import { getPathologyEffect } from '@/lib/pathologyEffects';
 import { isMuscleNode, getMuscleGroup, MUSCLE_GROUP_COLORS } from '@/lib/muscleFilter';
-import { JOINT_PRESET_MAP } from '@/lib/jointPresets';
 
 const SKELETON_URL = '/manus-storage/overview-skeleton_8b0752cc.glb';
 const UPPER_LIMB_URL = '/manus-storage/upper-limb_1ff7cbc0.glb';
 const LOWER_LIMB_URL = '/manus-storage/lower-limb_931f932f.glb';
 
+// Model bounding box: X[-0.34, 0.07], Y[0.009, 1.71], Z[-0.12, 0.14]
 const MODEL_SCALE = 4.7;
 const MODEL_OFFSET_X = 0.13 * MODEL_SCALE;
 const MODEL_OFFSET_Y = -0.009 * MODEL_SCALE;
 const MODEL_OFFSET_Z = -0.01 * MODEL_SCALE;
 
 // ============================================================
-// Region color palette - warm bone tones
+// Region color palette
 // ============================================================
 const REGION_COLORS: Record<string, THREE.Color> = {
   'skull': new THREE.Color('#E8DCC8'),
@@ -43,10 +48,9 @@ const SELECTED_EMISSIVE = new THREE.Color('#00D4FF');
 const HOVER_EMISSIVE = new THREE.Color('#00A8CC');
 const DEFAULT_EMISSIVE = new THREE.Color('#000000');
 const DIMMED_COLOR = new THREE.Color('#3A3A4A');
-const JOINT_HIGHLIGHT_EMISSIVE = new THREE.Color('#FFB020');
 
 // ============================================================
-// Interactive Bone Mesh - V1.5: joint highlighting + xray mode
+// Interactive Bone Mesh
 // ============================================================
 interface InteractiveBoneProps {
   geometry: THREE.BufferGeometry;
@@ -66,9 +70,7 @@ function InteractiveBone({ geometry, appBoneId, region, isMirror }: InteractiveB
   const hiddenBones = useAppStore((s) => s.hiddenBones);
   const lockedRegionId = useAppStore((s) => s.lockedRegionId);
   const muscleMode = useAppStore((s) => s.muscleMode);
-  const xrayMode = useAppStore((s) => s.xrayMode);
   const activePathologyIndex = useAppStore((s) => s.activePathologyIndex);
-  const activeJointPreset = useAppStore((s) => s.activeJointPreset);
   const selectBone = useAppStore((s) => s.selectBone);
   const hoverBone = useAppStore((s) => s.hoverBone);
 
@@ -77,16 +79,7 @@ function InteractiveBone({ geometry, appBoneId, region, isMirror }: InteractiveB
   const isVisible = visibleRegions.has(region) && !hiddenBones.has(appBoneId);
   const isDimmed = lockedRegionId !== null && lockedRegionId !== region;
 
-  // V1.5: Check if this bone is part of the active joint preset
-  const isJointBone = useMemo(() => {
-    if (!activeJointPreset) return false;
-    const preset = JOINT_PRESET_MAP[activeJointPreset];
-    return preset ? preset.bones.includes(appBoneId) : false;
-  }, [activeJointPreset, appBoneId]);
-
-  const isJointDimmed = activeJointPreset !== null && !isJointBone;
-
-  // Pathology effect
+  // Check if this bone has an active pathology effect
   const pathologyEffect = useMemo(() => {
     if (activePathologyIndex === null || selectedBoneId !== appBoneId) return null;
     const pathologies = BONE_PATHOLOGIES[appBoneId];
@@ -121,41 +114,16 @@ function InteractiveBone({ geometry, appBoneId, region, isMirror }: InteractiveB
       const pulse = pathologyEffect.pulseSpeed > 0
         ? 0.5 + 0.5 * Math.sin(glowTime.current * pathologyEffect.pulseSpeed)
         : 1;
+
       mat.color.lerp(pathColor, 0.12);
       mat.emissive.lerp(pathEmissive, 0.12);
-      mat.emissiveIntensity = THREE.MathUtils.lerp(mat.emissiveIntensity, pathologyEffect.emissiveIntensity * (0.6 + 0.4 * pulse), 0.1);
+      mat.emissiveIntensity = THREE.MathUtils.lerp(
+        mat.emissiveIntensity,
+        pathologyEffect.emissiveIntensity * (0.6 + 0.4 * pulse),
+        0.1
+      );
       mat.opacity = THREE.MathUtils.lerp(mat.opacity, pathologyEffect.opacity, 0.1);
       mat.roughness = THREE.MathUtils.lerp(mat.roughness, pathologyEffect.roughness, 0.05);
-      return;
-    }
-
-    // X-ray mode
-    if (xrayMode) {
-      mat.color.lerp(new THREE.Color('#88AACC'), 0.08);
-      mat.opacity = THREE.MathUtils.lerp(mat.opacity, isSelected ? 0.7 : isHovered ? 0.5 : 0.25, 0.08);
-      mat.emissive.lerp(isSelected ? SELECTED_EMISSIVE : isHovered ? HOVER_EMISSIVE : new THREE.Color('#2244AA'), 0.1);
-      mat.emissiveIntensity = THREE.MathUtils.lerp(mat.emissiveIntensity, isSelected ? 0.5 : isHovered ? 0.3 : 0.1, 0.1);
-      mat.roughness = THREE.MathUtils.lerp(mat.roughness, 0.2, 0.05);
-      return;
-    }
-
-    // Joint view mode - highlight joint bones, dim others
-    if (isJointBone) {
-      glowTime.current += delta;
-      const pulse = 0.5 + 0.5 * Math.sin(glowTime.current * 2);
-      mat.color.lerp(baseColor, 0.1);
-      mat.opacity = THREE.MathUtils.lerp(mat.opacity, 1, 0.1);
-      mat.emissive.lerp(isSelected ? SELECTED_EMISSIVE : JOINT_HIGHLIGHT_EMISSIVE, 0.1);
-      mat.emissiveIntensity = THREE.MathUtils.lerp(mat.emissiveIntensity, isSelected ? 0.5 : 0.15 + pulse * 0.1, 0.1);
-      mat.roughness = THREE.MathUtils.lerp(mat.roughness, 0.4, 0.05);
-      return;
-    }
-
-    if (isJointDimmed) {
-      mat.color.lerp(DIMMED_COLOR, 0.08);
-      mat.opacity = THREE.MathUtils.lerp(mat.opacity, 0.12, 0.08);
-      mat.emissive.lerp(DEFAULT_EMISSIVE, 0.1);
-      mat.emissiveIntensity = THREE.MathUtils.lerp(mat.emissiveIntensity, 0, 0.1);
       return;
     }
 
@@ -266,7 +234,7 @@ function MuscleMesh({ geometry, groupColor, isMirror }: MuscleMeshProps) {
     });
   }, [groupColor]);
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     if (!meshRef.current) return;
     const mat = meshRef.current.material as THREE.MeshStandardMaterial;
     const targetOpacity = muscleMode ? muscleOpacity : 0;
@@ -309,6 +277,7 @@ function BoneLabel() {
   const pos = (window as any).__bonePositions?.[selectedBoneId];
   if (!pos) return null;
 
+  // Get active pathology info if any
   const pathologies = BONE_PATHOLOGIES[selectedBoneId];
   const activePathology = activePathologyIndex !== null && pathologies
     ? pathologies[activePathologyIndex]
@@ -321,9 +290,9 @@ function BoneLabel() {
       distanceFactor={5}
       style={{ pointerEvents: 'none' }}
     >
-      <div className="px-2.5 py-1.5 rounded-lg bg-[#0D1220]/90 backdrop-blur-md border border-cyan-400/30 whitespace-nowrap shadow-lg shadow-cyan-500/10">
-        <div className="text-[11px] font-semibold text-cyan-300">{boneEntry.nameCn}</div>
-        <div className="text-[9px] font-mono text-cyan-400/50">{boneEntry.nameEn}</div>
+      <div className="px-2.5 py-1 rounded-md bg-black/80 backdrop-blur-sm border border-cyan-400/30 whitespace-nowrap">
+        <div className="text-[11px] font-medium text-cyan-300">{boneEntry.nameCn}</div>
+        <div className="text-[9px] font-mono text-cyan-400/60">{boneEntry.nameEn}</div>
         {activePathology && (
           <div className="text-[10px] font-medium text-red-400 mt-0.5 border-t border-red-400/20 pt-0.5">
             {activePathology.nameCn}
@@ -331,80 +300,6 @@ function BoneLabel() {
         )}
       </div>
     </Html>
-  );
-}
-
-// ============================================================
-// V1.5: All Bone Labels - annotation mode
-// ============================================================
-function AllBoneLabels() {
-  const labelMode = useAppStore((s) => s.labelMode);
-  const visibleRegions = useAppStore((s) => s.visibleRegions);
-  const hiddenBones = useAppStore((s) => s.hiddenBones);
-  const activeJointPreset = useAppStore((s) => s.activeJointPreset);
-  const [positions, setPositions] = useState<Record<string, [number, number, number]>>({});
-
-  useEffect(() => {
-    const check = () => {
-      const bp = (window as any).__bonePositions;
-      if (bp && Object.keys(bp).length > 0) {
-        setPositions({ ...bp });
-      } else {
-        requestAnimationFrame(check);
-      }
-    };
-    check();
-  }, []);
-
-  if (!labelMode || Object.keys(positions).length === 0) return null;
-
-  // In joint mode, only show labels for joint bones
-  const jointPreset = activeJointPreset ? JOINT_PRESET_MAP[activeJointPreset] : null;
-
-  // Show a subset of important bones to avoid clutter
-  const importantBones = new Set([
-    'cranium', 'mandible', 'cervical-vertebrae', 'thoracic-vertebrae', 'lumbar-vertebrae',
-    'sacrum', 'coccyx', 'sternum', 'clavicle-right', 'clavicle-left',
-    'scapula-right', 'scapula-left', 'humerus-right', 'humerus-left',
-    'radius-right', 'radius-left', 'ulna-right', 'ulna-left',
-    'ilium-right', 'ilium-left', 'femur-right', 'femur-left',
-    'patella-right', 'patella-left', 'tibia-right', 'tibia-left',
-    'fibula-right', 'fibula-left', 'calcaneus-right', 'calcaneus-left',
-    'rib-1-right', 'rib-5-right', 'rib-10-right',
-  ]);
-
-  return (
-    <>
-      {Object.entries(positions).map(([boneId, pos]) => {
-        const entry = APP_BONE_LOOKUP[boneId];
-        if (!entry) return null;
-
-        // Filter by visibility
-        if (!visibleRegions.has(entry.region)) return null;
-        if (hiddenBones.has(boneId)) return null;
-
-        // In joint mode, only show joint bone labels
-        if (jointPreset && !jointPreset.bones.includes(boneId)) return null;
-
-        // In full mode, only show important bones
-        if (!jointPreset && !importantBones.has(boneId)) return null;
-
-        return (
-          <Html
-            key={boneId}
-            position={[pos[0], pos[1] + 0.15, pos[2]]}
-            center
-            distanceFactor={8}
-            style={{ pointerEvents: 'none' }}
-          >
-            <div className="px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-sm border border-white/10 whitespace-nowrap">
-              <div className="text-[8px] font-medium text-slate-300 leading-tight">{entry.nameCn}</div>
-              <div className="text-[6px] font-mono text-slate-500 leading-tight">{entry.nameEn}</div>
-            </div>
-          </Html>
-        );
-      })}
-    </>
   );
 }
 
@@ -419,7 +314,6 @@ for (const originalName of Object.keys(GLB_NODE_TO_BONE)) {
 
 function SkeletonModel() {
   const { scene } = useGLTF(SKELETON_URL);
-  const setModelLoaded = useAppStore((s) => s.setModelLoaded);
 
   const bones = useMemo(() => {
     const result: { geometry: THREE.BufferGeometry; appBoneId: string; region: string; isMirror: boolean; center: [number, number, number] }[] = [];
@@ -443,12 +337,22 @@ function SkeletonModel() {
         center.z * MODEL_SCALE + MODEL_OFFSET_Z,
       ];
 
-      result.push({ geometry: geo, appBoneId: mapping.appBoneId, region: mapping.region, isMirror: false, center: scaledCenter });
+      result.push({
+        geometry: geo,
+        appBoneId: mapping.appBoneId,
+        region: mapping.region,
+        isMirror: false,
+        center: scaledCenter,
+      });
       bonePositions[mapping.appBoneId] = scaledCenter;
 
       if (mapping.mirror && mapping.mirrorAppBoneId) {
         const leftRegion = mapping.region.replace('-right', '-left');
-        const mirroredCenter: [number, number, number] = [2 * MODEL_OFFSET_X - scaledCenter[0], scaledCenter[1], scaledCenter[2]];
+        const mirroredCenter: [number, number, number] = [
+          2 * MODEL_OFFSET_X - scaledCenter[0],
+          scaledCenter[1],
+          scaledCenter[2],
+        ];
         result.push({
           geometry: geo,
           appBoneId: mapping.mirrorAppBoneId,
@@ -464,11 +368,6 @@ function SkeletonModel() {
     return result;
   }, [scene]);
 
-  // Signal model loaded
-  useEffect(() => {
-    if (bones.length > 0) setModelLoaded(true);
-  }, [bones.length, setModelLoaded]);
-
   return (
     <group>
       {bones.map(({ geometry, appBoneId, region, isMirror }) => (
@@ -482,13 +381,12 @@ function SkeletonModel() {
         />
       ))}
       <BoneLabel />
-      <AllBoneLabels />
     </group>
   );
 }
 
 // ============================================================
-// Muscle Overlay Loader
+// Muscle Overlay Loader - loads upper-limb and lower-limb GLB
 // ============================================================
 function MuscleOverlay() {
   const { scene: upperScene } = useGLTF(UPPER_LIMB_URL);
@@ -501,14 +399,19 @@ function MuscleOverlay() {
       scene.traverse((child) => {
         if (!(child instanceof THREE.Mesh)) return;
         const rawName = child.name;
+        // Reverse Three.js sanitization
         const originalName = rawName.replace(/_/g, ' ');
+        
         if (!isMuscleNode(originalName)) return;
 
         const group = getMuscleGroup(originalName);
         const color = MUSCLE_GROUP_COLORS[group];
         const geo = child.geometry;
 
+        // Right side (original)
         result.push({ geometry: geo, groupColor: color, isMirror: false, nodeName: originalName });
+        
+        // Mirror for left side if node name ends with .r or .r (sanitized)
         if (rawName.endsWith('r') || originalName.endsWith('.r') || originalName.endsWith('.r.')) {
           result.push({ geometry: geo, groupColor: color, isMirror: true, nodeName: originalName + '_L' });
         }
@@ -517,20 +420,26 @@ function MuscleOverlay() {
 
     processScene(upperScene);
     processScene(lowerScene);
+
     return result;
   }, [upperScene, lowerScene]);
 
   return (
     <group>
       {muscles.map(({ geometry, groupColor, isMirror, nodeName }, i) => (
-        <MuscleMesh key={`${nodeName}-${i}`} geometry={geometry} groupColor={groupColor} isMirror={isMirror} />
+        <MuscleMesh
+          key={`${nodeName}-${i}`}
+          geometry={geometry}
+          groupColor={groupColor}
+          isMirror={isMirror}
+        />
       ))}
     </group>
   );
 }
 
 // ============================================================
-// Camera Controller - V1.5: joint preset camera transitions
+// Camera Controller with smooth transitions
 // ============================================================
 function CameraController() {
   const controlsRef = useRef<any>(null);
@@ -539,10 +448,8 @@ function CameraController() {
   const cameraPosition = useAppStore((s) => s.cameraPosition);
   const selectedBoneId = useAppStore((s) => s.selectedBoneId);
   const lockedRegionId = useAppStore((s) => s.lockedRegionId);
-  const activeJointPreset = useAppStore((s) => s.activeJointPreset);
   const animRef = useRef<number>(0);
 
-  // Animate camera to position + target
   useEffect(() => {
     if (!controlsRef.current || !cameraPosition || !cameraTarget) return;
     if (animRef.current) cancelAnimationFrame(animRef.current);
@@ -554,7 +461,7 @@ function CameraController() {
 
     let progress = 0;
     const animate = () => {
-      progress += 0.025;
+      progress += 0.03;
       if (progress >= 1) {
         controlsRef.current!.target.copy(endTarget);
         camera.position.copy(endPos);
@@ -569,10 +476,10 @@ function CameraController() {
       animRef.current = requestAnimationFrame(animate);
     };
     animate();
+
     return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
   }, [cameraPosition, cameraTarget, camera]);
 
-  // Animate camera to target only (keep direction)
   useEffect(() => {
     if (!controlsRef.current || !cameraTarget || cameraPosition) return;
     if (animRef.current) cancelAnimationFrame(animRef.current);
@@ -588,7 +495,7 @@ function CameraController() {
 
     let progress = 0;
     const animate = () => {
-      progress += 0.025;
+      progress += 0.03;
       if (progress >= 1) {
         controlsRef.current!.target.copy(targetVec);
         camera.position.copy(newPos);
@@ -602,39 +509,35 @@ function CameraController() {
       animRef.current = requestAnimationFrame(animate);
     };
     animate();
+
     return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
   }, [cameraTarget, camera]);
 
-  // Focus on selected bone
   useEffect(() => {
     if (!selectedBoneId || !controlsRef.current) return;
     const pos = (window as any).__bonePositions?.[selectedBoneId];
-    if (pos) useAppStore.getState().setCameraTarget(pos);
+    if (pos) {
+      useAppStore.getState().setCameraTarget(pos);
+    }
   }, [selectedBoneId]);
 
-  // Focus on locked region
   useEffect(() => {
     if (!lockedRegionId || !controlsRef.current) return;
     const positions = (window as any).__bonePositions;
     if (!positions) return;
+
     const regionBones = Object.entries(APP_BONE_LOOKUP)
       .filter(([_, entry]) => entry.region === lockedRegionId)
       .map(([id]) => positions[id])
       .filter(Boolean);
+
     if (regionBones.length === 0) return;
+
     const center = new THREE.Vector3();
     regionBones.forEach((p: [number, number, number]) => center.add(new THREE.Vector3(...p)));
     center.divideScalar(regionBones.length);
     useAppStore.getState().setCameraTarget([center.x, center.y, center.z]);
   }, [lockedRegionId]);
-
-  // V1.5: Focus on joint preset
-  useEffect(() => {
-    if (!activeJointPreset || !controlsRef.current) return;
-    const preset = JOINT_PRESET_MAP[activeJointPreset];
-    if (!preset) return;
-    useAppStore.getState().setCameraPreset(preset.cameraPosition, preset.cameraTarget);
-  }, [activeJointPreset]);
 
   return (
     <OrbitControls
@@ -702,8 +605,17 @@ export default function SkeletonScene() {
   return (
     <div className="w-full h-full absolute inset-0">
       <Canvas
-        camera={{ position: [0, 4, 10], fov: 45, near: 0.01, far: 100 }}
-        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.1 }}
+        camera={{
+          position: [0, 4, 10],
+          fov: 45,
+          near: 0.01,
+          far: 100,
+        }}
+        gl={{
+          antialias: true,
+          toneMapping: THREE.ACESFilmicToneMapping,
+          toneMappingExposure: 1.1,
+        }}
         onPointerMissed={() => selectBone(null)}
         style={{ background: 'linear-gradient(180deg, #0A0E17 0%, #0D1220 50%, #101828 100%)' }}
       >
@@ -718,6 +630,7 @@ export default function SkeletonScene() {
   );
 }
 
+// Preload all GLB models
 useGLTF.preload(SKELETON_URL);
 useGLTF.preload(UPPER_LIMB_URL);
 useGLTF.preload(LOWER_LIMB_URL);

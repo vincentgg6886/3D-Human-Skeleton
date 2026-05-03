@@ -1,63 +1,63 @@
 /*
- * Toolbar.tsx - Left sidebar toolbar with labeled icons
- * V1.1: Icon + text labels (width 64px), grouped sections
- * V1.2: Refined visual hierarchy, active states with color coding
+ * Toolbar.tsx - Left vertical toolbar (48px wide)
+ * Design: Scientific Instrument Aesthetic - minimal icons on glass panel
  */
 
 import { useAppStore } from '@/lib/store';
 import {
+  RotateCcw,
+  Eye,
+  Lock,
+  Unlock,
+  Move3d,
   Layers,
   Info,
   Activity,
   Stethoscope,
-  RotateCcw,
+  ChevronLeft,
+  ChevronRight,
   Heart,
-  Tag,
-  Bone,
-  HelpCircle,
-  Move3d,
 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
-interface ToolButtonProps {
+function ToolButton({
+  icon: Icon,
+  label,
+  onClick,
+  active = false,
+  variant = 'default',
+}: {
   icon: React.ComponentType<any>;
   label: string;
-  active?: boolean;
   onClick: () => void;
-  variant?: 'default' | 'muscle' | 'accent' | 'label';
-}
-
-function ToolButton({ icon: Icon, label, active, onClick, variant = 'default' }: ToolButtonProps) {
-  const colorMap: Record<string, { active: string; idle: string }> = {
-    default: {
-      active: 'text-cyan-400 bg-cyan-400/10 border-cyan-400/25',
-      idle: 'text-slate-500 hover:text-slate-300 hover:bg-white/5 border-transparent',
-    },
-    muscle: {
-      active: 'text-red-400 bg-red-400/10 border-red-400/25',
-      idle: 'text-slate-500 hover:text-red-300 hover:bg-red-400/5 border-transparent',
-    },
-    accent: {
-      active: 'text-amber-400 bg-amber-400/10 border-amber-400/25',
-      idle: 'text-slate-500 hover:text-amber-300 hover:bg-amber-400/5 border-transparent',
-    },
-    label: {
-      active: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/25',
-      idle: 'text-slate-500 hover:text-emerald-300 hover:bg-emerald-400/5 border-transparent',
-    },
-  };
-
-  const colors = colorMap[variant];
+  active?: boolean;
+  variant?: 'default' | 'accent' | 'danger' | 'muscle';
+}) {
+  const colorClass =
+    variant === 'accent'
+      ? 'text-cyan-400 bg-cyan-400/10'
+      : variant === 'danger'
+        ? 'text-amber-400 bg-amber-400/10'
+        : variant === 'muscle'
+          ? 'text-red-400 bg-red-400/10'
+          : active
+            ? 'text-cyan-400 bg-cyan-400/10'
+            : 'text-slate-400 hover:text-slate-200 hover:bg-white/5';
 
   return (
-    <button
-      onClick={onClick}
-      className={`relative w-full flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border transition-all duration-200 ${
-        active ? colors.active : colors.idle
-      }`}
-    >
-      <Icon size={17} strokeWidth={1.6} />
-      <span className="text-[9px] font-medium leading-tight tracking-wide">{label}</span>
-    </button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          onClick={onClick}
+          className={`w-10 h-10 flex items-center justify-center rounded-lg transition-all duration-200 ${colorClass}`}
+        >
+          <Icon size={18} strokeWidth={1.5} />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="right" className="glass text-xs font-mono">
+        {label}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -66,113 +66,110 @@ export default function Toolbar() {
   const setSidebarOpen = useAppStore((s) => s.setSidebarOpen);
   const activeTab = useAppStore((s) => s.activeTab);
   const setActiveTab = useAppStore((s) => s.setActiveTab);
+  const lockedRegionId = useAppStore((s) => s.lockedRegionId);
+  const lockRegion = useAppStore((s) => s.lockRegion);
   const resetView = useAppStore((s) => s.resetView);
+  const showAllRegions = useAppStore((s) => s.showAllRegions);
   const muscleMode = useAppStore((s) => s.muscleMode);
   const toggleMuscleMode = useAppStore((s) => s.toggleMuscleMode);
-  const labelMode = useAppStore((s) => s.labelMode);
-  const toggleLabelMode = useAppStore((s) => s.toggleLabelMode);
-  const setShowOnboarding = useAppStore((s) => s.setShowOnboarding);
-
-  const handleTabClick = (tab: typeof activeTab) => {
-    if (activeTab === tab && sidebarOpen) {
-      setSidebarOpen(false);
-    } else {
-      setActiveTab(tab);
-      setSidebarOpen(true);
-    }
-  };
 
   return (
-    <div className="absolute left-2 top-1/2 -translate-y-1/2 z-30 w-[64px]">
-      <div className="glass-strong rounded-xl px-1 py-2 flex flex-col gap-0.5">
-        {/* Logo */}
-        <div className="flex justify-center mb-1">
-          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
-            <Move3d size={16} className="text-white" strokeWidth={2} />
-          </div>
-        </div>
+    <div className="absolute left-0 top-0 bottom-0 w-12 flex flex-col items-center py-3 z-30 glass-strong border-r border-white/5">
+      {/* Logo */}
+      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center mb-4">
+        <Move3d size={16} className="text-white" strokeWidth={2} />
+      </div>
 
-        {/* Section: Navigation */}
-        <div className="px-1 mt-1 mb-0.5">
-          <div className="text-[7px] font-mono text-slate-600 uppercase tracking-[0.15em] text-center">导航</div>
-        </div>
+      {/* Divider */}
+      <div className="w-6 h-px bg-white/10 mb-3" />
+
+      {/* Main tools */}
+      <div className="flex flex-col gap-1">
         <ToolButton
           icon={Layers}
-          label="层级"
+          label="解剖层级"
+          onClick={() => {
+            setActiveTab('hierarchy');
+            setSidebarOpen(true);
+          }}
           active={activeTab === 'hierarchy' && sidebarOpen}
-          onClick={() => handleTabClick('hierarchy')}
         />
         <ToolButton
           icon={Info}
-          label="信息"
+          label="骨骼信息"
+          onClick={() => {
+            setActiveTab('info');
+            setSidebarOpen(true);
+          }}
           active={activeTab === 'info' && sidebarOpen}
-          onClick={() => handleTabClick('info')}
         />
-        <ToolButton
-          icon={Bone}
-          label="关节"
-          active={activeTab === 'joints' && sidebarOpen}
-          onClick={() => handleTabClick('joints')}
-          variant="accent"
-        />
-
-        {/* Divider */}
-        <div className="mx-2 my-1 h-px bg-white/5" />
-
-        {/* Section: Clinical */}
-        <div className="px-1 mb-0.5">
-          <div className="text-[7px] font-mono text-slate-600 uppercase tracking-[0.15em] text-center">临床</div>
-        </div>
         <ToolButton
           icon={Activity}
-          label="运动"
+          label="运动模拟"
+          onClick={() => {
+            setActiveTab('motion');
+            setSidebarOpen(true);
+          }}
           active={activeTab === 'motion' && sidebarOpen}
-          onClick={() => handleTabClick('motion')}
         />
         <ToolButton
           icon={Stethoscope}
-          label="病症"
+          label="常见病症"
+          onClick={() => {
+            setActiveTab('pathology');
+            setSidebarOpen(true);
+          }}
           active={activeTab === 'pathology' && sidebarOpen}
-          onClick={() => handleTabClick('pathology')}
-        />
-
-        {/* Divider */}
-        <div className="mx-2 my-1 h-px bg-white/5" />
-
-        {/* Section: Display modes */}
-        <div className="px-1 mb-0.5">
-          <div className="text-[7px] font-mono text-slate-600 uppercase tracking-[0.15em] text-center">显示</div>
-        </div>
-        <ToolButton
-          icon={Heart}
-          label="肌肉"
-          active={muscleMode}
-          onClick={toggleMuscleMode}
-          variant="muscle"
-        />
-        <ToolButton
-          icon={Tag}
-          label="标注"
-          active={labelMode}
-          onClick={toggleLabelMode}
-          variant="label"
-        />
-
-        {/* Divider */}
-        <div className="mx-2 my-1 h-px bg-white/5" />
-
-        {/* Utility */}
-        <ToolButton
-          icon={RotateCcw}
-          label="重置"
-          onClick={resetView}
-        />
-        <ToolButton
-          icon={HelpCircle}
-          label="帮助"
-          onClick={() => setShowOnboarding(true)}
         />
       </div>
+
+      {/* Divider */}
+      <div className="w-6 h-px bg-white/10 my-3" />
+
+      {/* Display modes */}
+      <div className="flex flex-col gap-1">
+        <ToolButton
+          icon={Heart}
+          label={muscleMode ? '关闭肌肉层' : '显示肌肉层'}
+          onClick={toggleMuscleMode}
+          active={muscleMode}
+          variant={muscleMode ? 'muscle' : 'default'}
+        />
+      </div>
+
+      {/* Divider */}
+      <div className="w-6 h-px bg-white/10 my-3" />
+
+      {/* View controls */}
+      <div className="flex flex-col gap-1">
+        <ToolButton
+          icon={Eye}
+          label="显示全部"
+          onClick={showAllRegions}
+        />
+        <ToolButton
+          icon={lockedRegionId ? Unlock : Lock}
+          label={lockedRegionId ? '解锁区域' : '锁定区域'}
+          onClick={() => lockRegion(lockedRegionId ? null : null)}
+          active={!!lockedRegionId}
+          variant={lockedRegionId ? 'accent' : 'default'}
+        />
+        <ToolButton
+          icon={RotateCcw}
+          label="重置视图"
+          onClick={resetView}
+        />
+      </div>
+
+      {/* Spacer */}
+      <div className="flex-1" />
+
+      {/* Toggle sidebar */}
+      <ToolButton
+        icon={sidebarOpen ? ChevronLeft : ChevronRight}
+        label={sidebarOpen ? '收起面板' : '展开面板'}
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+      />
     </div>
   );
 }
