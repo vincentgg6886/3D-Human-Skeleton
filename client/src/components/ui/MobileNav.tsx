@@ -1,7 +1,9 @@
 /*
- * MobileNav.tsx - Bottom navigation bar for mobile devices
- * V1.5: Added joints, label, xray mode toggles via expandable menu
- * Design: Compact glass bar with tab icons
+ * MobileNav.tsx - Mobile bottom navigation + view controls
+ * V2.0: Full-featured mobile experience
+ *   - Primary nav bar with core tabs
+ *   - Expandable "more" tray for toggles + view presets + region selector
+ *   - Swipe-up gesture via Drawer for side panel content
  */
 
 import { useState } from 'react';
@@ -13,47 +15,113 @@ import {
   Stethoscope,
   RotateCcw,
   Heart,
-  Bone,
   Tag,
+  Bone,
   Scan,
   MoreHorizontal,
   X,
+  ChevronUp,
+  Focus,
+  Eye,
+  Move3d,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+/* ── Mobile Tab Button ── */
 function MobileTabButton({
   icon: Icon,
   label,
   active,
   onClick,
   variant = 'default',
+  badge,
 }: {
   icon: React.ComponentType<any>;
   label: string;
   active: boolean;
   onClick: () => void;
   variant?: 'default' | 'muscle' | 'accent' | 'xray' | 'label';
+  badge?: boolean;
 }) {
   const activeClassMap: Record<string, string> = {
-    default: 'text-cyan-400 bg-cyan-400/10',
-    muscle: 'text-red-400 bg-red-400/10',
-    accent: 'text-amber-400 bg-amber-400/10',
-    xray: 'text-blue-400 bg-blue-400/10',
-    label: 'text-emerald-400 bg-emerald-400/10',
+    default: 'text-cyan-400',
+    muscle: 'text-red-400',
+    accent: 'text-amber-400',
+    xray: 'text-blue-400',
+    label: 'text-emerald-400',
   };
 
   return (
     <button
       onClick={onClick}
-      className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition-all ${
-        active ? activeClassMap[variant] : 'text-slate-500'
+      className={`relative flex flex-col items-center gap-0.5 px-2.5 py-1.5 rounded-lg transition-all duration-200 ${
+        active ? activeClassMap[variant] : 'text-slate-500 active:text-slate-300'
       }`}
     >
+      {/* Active indicator dot for toggles */}
+      {badge && (
+        <div className={`absolute top-0.5 right-1 w-[5px] h-[5px] rounded-full transition-all ${
+          active
+            ? `bg-current shadow-[0_0_4px_currentColor]`
+            : 'bg-slate-600/40'
+        }`} />
+      )}
       <Icon size={18} strokeWidth={1.5} />
-      <span className="text-[9px] font-mono">{label}</span>
+      <span className="text-[9px] font-medium">{label}</span>
     </button>
   );
 }
+
+/* ── View Preset Button ── */
+function PresetButton({ label, onClick, active }: { label: string; onClick: () => void; active?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`w-9 h-9 rounded-lg flex items-center justify-center text-[12px] font-semibold transition-all duration-200 ${
+        active
+          ? 'bg-cyan-400/15 text-cyan-400 border border-cyan-400/25'
+          : 'bg-white/[0.04] text-slate-400 border border-white/6 active:bg-white/8'
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+/* ── Region Button ── */
+function RegionButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all duration-200 whitespace-nowrap ${
+        active
+          ? 'bg-cyan-400/12 text-cyan-300 border border-cyan-400/25'
+          : 'bg-white/[0.04] text-slate-400 border border-white/6 active:bg-white/8'
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+const VIEW_PRESETS = [
+  { label: '前', position: [0, 4, 10] as [number, number, number] },
+  { label: '后', position: [0, 4, -10] as [number, number, number] },
+  { label: '左', position: [-10, 4, 0] as [number, number, number] },
+  { label: '右', position: [10, 4, 0] as [number, number, number] },
+  { label: '上', position: [0, 16, 0.1] as [number, number, number] },
+];
+
+const REGIONS = [
+  { id: 'skull', label: '颅骨' },
+  { id: 'spine', label: '脊柱' },
+  { id: 'thorax', label: '胸廓' },
+  { id: 'upper-limb-right', label: '右上肢' },
+  { id: 'upper-limb-left', label: '左上肢' },
+  { id: 'pelvis', label: '骨盆' },
+  { id: 'lower-limb-right', label: '右下肢' },
+  { id: 'lower-limb-left', label: '左下肢' },
+];
 
 export default function MobileNav() {
   const sidebarOpen = useAppStore((s) => s.sidebarOpen);
@@ -67,6 +135,9 @@ export default function MobileNav() {
   const toggleLabelMode = useAppStore((s) => s.toggleLabelMode);
   const xrayMode = useAppStore((s) => s.xrayMode);
   const toggleXrayMode = useAppStore((s) => s.toggleXrayMode);
+  const setCameraPreset = useAppStore((s) => s.setCameraPreset);
+  const lockedRegionId = useAppStore((s) => s.lockedRegionId);
+  const lockRegion = useAppStore((s) => s.lockRegion);
   const [moreOpen, setMoreOpen] = useState(false);
 
   const handleTabClick = (tab: 'hierarchy' | 'info' | 'motion' | 'pathology' | 'joints') => {
@@ -83,6 +154,104 @@ export default function MobileNav() {
     <>
       {/* Mobile bottom nav - only visible on small screens */}
       <div className="sm:hidden absolute bottom-0 left-0 right-0 z-40 glass-strong border-t border-white/5">
+        {/* Expandable more tray */}
+        <AnimatePresence>
+          {moreOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+              className="overflow-hidden border-b border-white/5"
+            >
+              <div className="px-3 py-3 space-y-3">
+                {/* Display mode toggles */}
+                <div>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Eye size={10} className="text-slate-500" />
+                    <span className="text-[9px] font-mono text-slate-500 uppercase tracking-wider">显示模式</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <MobileTabButton
+                      icon={Heart}
+                      label="肌肉"
+                      active={muscleMode}
+                      onClick={() => toggleMuscleMode()}
+                      variant="muscle"
+                      badge
+                    />
+                    <MobileTabButton
+                      icon={Scan}
+                      label="X光"
+                      active={xrayMode}
+                      onClick={() => toggleXrayMode()}
+                      variant="xray"
+                      badge
+                    />
+                    <MobileTabButton
+                      icon={Tag}
+                      label="标注"
+                      active={labelMode}
+                      onClick={() => toggleLabelMode()}
+                      variant="label"
+                      badge
+                    />
+                    <MobileTabButton
+                      icon={Activity}
+                      label="运动"
+                      active={activeTab === 'motion' && sidebarOpen}
+                      onClick={() => handleTabClick('motion')}
+                    />
+                    <button
+                      onClick={() => { resetView(); setMoreOpen(false); }}
+                      className="flex flex-col items-center gap-0.5 px-2.5 py-1.5 rounded-lg text-slate-500 active:text-slate-300 transition-all"
+                    >
+                      <RotateCcw size={18} strokeWidth={1.5} />
+                      <span className="text-[9px] font-medium">重置</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* View presets */}
+                <div>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Move3d size={10} className="text-slate-500" />
+                    <span className="text-[9px] font-mono text-slate-500 uppercase tracking-wider">视角预设</span>
+                  </div>
+                  <div className="flex gap-1.5">
+                    {VIEW_PRESETS.map((preset) => (
+                      <PresetButton
+                        key={preset.label}
+                        label={preset.label}
+                        onClick={() => setCameraPreset(preset.position, [0, 4, 0])}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Region selector */}
+                <div>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Focus size={10} className="text-slate-500" />
+                    <span className="text-[9px] font-mono text-slate-500 uppercase tracking-wider">区域聚焦</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {REGIONS.map((region) => (
+                      <RegionButton
+                        key={region.id}
+                        label={region.label}
+                        active={lockedRegionId === region.id}
+                        onClick={() => lockRegion(lockedRegionId === region.id ? null : region.id)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Primary nav bar */}
         <div className="flex items-center justify-around px-1 py-1 safe-area-bottom">
           <MobileTabButton
             icon={Layers}
@@ -109,67 +278,22 @@ export default function MobileNav() {
             active={activeTab === 'pathology' && sidebarOpen}
             onClick={() => handleTabClick('pathology')}
           />
-          <MobileTabButton
-            icon={Heart}
-            label="肌肉"
-            active={muscleMode}
-            onClick={toggleMuscleMode}
-            variant="muscle"
-          />
+
           {/* More menu button */}
           <button
             onClick={() => setMoreOpen(!moreOpen)}
-            className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition-all ${
-              moreOpen ? 'text-cyan-400 bg-cyan-400/10' : 'text-slate-500'
+            className={`flex flex-col items-center gap-0.5 px-2.5 py-1.5 rounded-lg transition-all duration-200 ${
+              moreOpen ? 'text-cyan-400' : 'text-slate-500 active:text-slate-300'
             }`}
           >
-            {moreOpen ? <X size={18} strokeWidth={1.5} /> : <MoreHorizontal size={18} strokeWidth={1.5} />}
-            <span className="text-[9px] font-mono">{moreOpen ? '关闭' : '更多'}</span>
+            {moreOpen ? (
+              <X size={18} strokeWidth={1.5} />
+            ) : (
+              <ChevronUp size={18} strokeWidth={1.5} />
+            )}
+            <span className="text-[9px] font-medium">{moreOpen ? '收起' : '更多'}</span>
           </button>
         </div>
-
-        {/* Expandable more menu */}
-        <AnimatePresence>
-          {moreOpen && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="overflow-hidden border-t border-white/5"
-            >
-              <div className="flex items-center justify-around px-2 py-2">
-                <MobileTabButton
-                  icon={Activity}
-                  label="运动"
-                  active={activeTab === 'motion' && sidebarOpen}
-                  onClick={() => handleTabClick('motion')}
-                />
-                <MobileTabButton
-                  icon={Scan}
-                  label="X光"
-                  active={xrayMode}
-                  onClick={() => { toggleXrayMode(); setMoreOpen(false); }}
-                  variant="xray"
-                />
-                <MobileTabButton
-                  icon={Tag}
-                  label="标注"
-                  active={labelMode}
-                  onClick={() => { toggleLabelMode(); setMoreOpen(false); }}
-                  variant="label"
-                />
-                <button
-                  onClick={() => { resetView(); setMoreOpen(false); }}
-                  className="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg text-slate-500"
-                >
-                  <RotateCcw size={18} strokeWidth={1.5} />
-                  <span className="text-[9px] font-mono">重置</span>
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
 
       {/* Mobile sidebar overlay */}

@@ -1,6 +1,6 @@
 /*
  * OnboardingDialog.tsx - First-visit onboarding guide
- * V1.1: 3-step interactive coach marks
+ * V2.0: Improved text contrast (WCAG AA), clearer step descriptions
  * Design: Dark glass modal matching surgical microscope aesthetic
  */
 
@@ -8,7 +8,7 @@ import { useState, useCallback } from 'react';
 import { useAppStore } from '@/lib/store';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MousePointer2, Move3d, Layers, Stethoscope, ChevronRight, X } from 'lucide-react';
+import { MousePointer2, Move3d, Layers, Stethoscope, ChevronRight, X, Keyboard } from 'lucide-react';
 
 const STEPS = [
   {
@@ -44,6 +44,17 @@ const STEPS = [
     ],
     color: '#00D4FF',
   },
+  {
+    icon: Keyboard,
+    title: '快捷键操作',
+    subtitle: '高效操作，快速切换功能',
+    items: [
+      { label: '1-5', desc: '切换面板标签页（层级/信息/关节/运动/病症）' },
+      { label: 'M / X / L', desc: '切换肌肉 / X光 / 标注模式' },
+      { label: 'Space / Esc', desc: '重置视图 / 取消选择' },
+    ],
+    color: '#00D4FF',
+  },
 ];
 
 export default function OnboardingDialog() {
@@ -53,6 +64,7 @@ export default function OnboardingDialog() {
 
   const handleClose = useCallback(() => {
     setShowOnboarding(false);
+    setStep(0);
     try { localStorage.setItem('orthovis-onboarding-seen', 'true'); } catch {}
   }, [setShowOnboarding]);
 
@@ -78,7 +90,7 @@ export default function OnboardingDialog() {
           <div className="relative px-6 pt-6 pb-4">
             <button
               onClick={handleClose}
-              className="absolute top-4 right-4 w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-500 hover:text-slate-300 transition-colors"
+              className="absolute top-4 right-4 w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-colors"
             >
               <X size={14} />
             </button>
@@ -86,16 +98,17 @@ export default function OnboardingDialog() {
             {/* Step indicator */}
             <div className="flex items-center gap-1.5 mb-5">
               {STEPS.map((_, i) => (
-                <div
+                <button
                   key={i}
-                  className="h-1 rounded-full transition-all duration-500"
+                  onClick={() => setStep(i)}
+                  className="h-1.5 rounded-full transition-all duration-500"
                   style={{
-                    width: i === step ? 24 : 8,
-                    backgroundColor: i === step ? current.color : i < step ? current.color + '60' : 'rgba(255,255,255,0.08)',
+                    width: i === step ? 24 : 10,
+                    backgroundColor: i === step ? current.color : i < step ? current.color + '60' : 'rgba(255,255,255,0.12)',
                   }}
                 />
               ))}
-              <span className="ml-auto text-[10px] font-mono text-slate-600">
+              <span className="ml-auto text-[10px] font-mono text-slate-400">
                 {step + 1}/{STEPS.length}
               </span>
             </div>
@@ -117,10 +130,10 @@ export default function OnboardingDialog() {
                     <Icon size={20} style={{ color: current.color }} />
                   </div>
                   <div>
-                    <DialogTitle className="text-base font-semibold text-slate-100 leading-tight">
+                    <DialogTitle className="text-base font-semibold text-white leading-tight">
                       {current.title}
                     </DialogTitle>
-                    <DialogDescription className="text-xs text-slate-500 mt-0.5">
+                    <DialogDescription className="text-xs text-slate-300 mt-0.5">
                       {current.subtitle}
                     </DialogDescription>
                   </div>
@@ -143,15 +156,15 @@ export default function OnboardingDialog() {
                 {current.items.map((item, i) => (
                   <div
                     key={i}
-                    className="flex items-start gap-3 px-3 py-2.5 rounded-lg bg-white/[0.03] border border-white/5"
+                    className="flex items-start gap-3 px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/6"
                   >
                     <div
                       className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0"
                       style={{ backgroundColor: current.color }}
                     />
                     <div>
-                      <div className="text-[12px] font-medium text-slate-200">{item.label}</div>
-                      <div className="text-[11px] text-slate-500 mt-0.5">{item.desc}</div>
+                      <div className="text-[12px] font-semibold text-slate-100">{item.label}</div>
+                      <div className="text-[11px] text-slate-300 mt-0.5">{item.desc}</div>
                     </div>
                   </div>
                 ))}
@@ -163,13 +176,13 @@ export default function OnboardingDialog() {
           <div className="px-6 pb-5 flex items-center justify-between">
             <button
               onClick={handleClose}
-              className="text-[11px] text-slate-600 hover:text-slate-400 transition-colors"
+              className="text-[11px] text-slate-400 hover:text-slate-200 transition-colors"
             >
               跳过引导
             </button>
             <button
               onClick={handleNext}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[12px] font-medium transition-all duration-200 hover:brightness-110"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[12px] font-semibold transition-all duration-200 hover:brightness-110 active:scale-[0.97]"
               style={{
                 backgroundColor: current.color + '20',
                 color: current.color,

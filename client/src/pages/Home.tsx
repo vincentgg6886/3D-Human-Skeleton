@@ -1,7 +1,6 @@
 /*
  * Home.tsx - Main application page
- * V1.1: Onboarding dialog, branded loading screen
- * V1.2: Refined layout and visual hierarchy
+ * V2.0: Improved mobile layout, SidePanel responsive positioning
  */
 
 import { Suspense } from 'react';
@@ -72,7 +71,7 @@ export default function Home() {
       {/* Mobile UI */}
       <MobileNav />
 
-      {/* Onboarding - V1.1 */}
+      {/* Onboarding */}
       <OnboardingDialog />
     </div>
   );

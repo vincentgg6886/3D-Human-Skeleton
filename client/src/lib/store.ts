@@ -45,11 +45,16 @@ interface AppState {
   // Display Modes
   muscleMode: boolean;
   muscleOpacity: number;
-  labelMode: boolean;        // V1.5: bone label annotations
-  xrayMode: boolean;         // X-ray transparency mode
+  labelMode: boolean;
+  xrayMode: boolean;
 
-  // Joint View - V1.5
+  // Joint View
   activeJointPreset: string | null;
+
+  // Joint Motion Animation - V2.0
+  jointMotionPlaying: boolean;
+  jointMotionId: string | null;
+  jointMotionSpeed: number;
 
   // Pathology Visualization
   activePathologyIndex: number | null;
@@ -59,8 +64,8 @@ interface AppState {
   infoPanelOpen: boolean;
   searchQuery: string;
   activeTab: 'hierarchy' | 'info' | 'motion' | 'pathology' | 'joints';
-  showOnboarding: boolean;   // V1.1: first-visit onboarding
-  modelLoaded: boolean;      // V1.1: loading state tracking
+  showOnboarding: boolean;
+  modelLoaded: boolean;
 
   // View
   viewMode: 'full' | 'region';
@@ -95,6 +100,11 @@ interface AppState {
   // Joint view
   setActiveJointPreset: (id: string | null) => void;
 
+  // Joint motion animation
+  setJointMotionPlaying: (playing: boolean) => void;
+  setJointMotionId: (id: string | null) => void;
+  setJointMotionSpeed: (speed: number) => void;
+
   // Pathology visualization
   setActivePathology: (index: number | null) => void;
 
@@ -125,6 +135,9 @@ export const useAppStore = create<AppState>((set) => ({
   labelMode: false,
   xrayMode: false,
   activeJointPreset: null,
+  jointMotionPlaying: false,
+  jointMotionId: null,
+  jointMotionSpeed: 1,
   activePathologyIndex: null,
   sidebarOpen: false,
   infoPanelOpen: false,
@@ -187,6 +200,12 @@ export const useAppStore = create<AppState>((set) => ({
   toggleXrayMode: () => set((state) => ({ xrayMode: !state.xrayMode })),
 
   setActiveJointPreset: (id) => set({ activeJointPreset: id }),
+
+  // Joint motion animation
+  setJointMotionPlaying: (playing) => set({ jointMotionPlaying: playing }),
+  setJointMotionId: (id) => set({ jointMotionId: id }),
+  setJointMotionSpeed: (speed) => set({ jointMotionSpeed: speed }),
+
   setActivePathology: (index) => set({ activePathologyIndex: index }),
 
   setShowOnboarding: (show) => set({ showOnboarding: show }),
@@ -207,5 +226,7 @@ export const useAppStore = create<AppState>((set) => ({
     xrayMode: false,
     activeJointPreset: null,
     activePathologyIndex: null,
+    jointMotionPlaying: false,
+    jointMotionId: null,
   }),
 }));

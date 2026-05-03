@@ -1,6 +1,6 @@
 /*
  * ControlsHint.tsx - Bottom-right controls hint
- * V1.2: Glass panel styling, auto-hide after 6s
+ * V2.0: Improved contrast, mobile-aware positioning
  */
 
 import { useState, useEffect } from 'react';
@@ -23,29 +23,29 @@ export default function ControlsHint() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 10 }}
           transition={{ duration: 0.3 }}
-          className="absolute bottom-4 right-4 z-30 max-w-[260px]"
+          className="absolute bottom-16 sm:bottom-4 right-3 sm:right-4 z-20 max-w-[260px]"
         >
-          <div className="glass-panel-subtle rounded-lg px-3 py-2 text-micro font-data text-slate-500 space-y-1 relative">
+          <div className="glass-panel-subtle rounded-lg px-3 py-2 text-micro font-data text-slate-300 space-y-1 relative">
             <button
               onClick={() => setVisible(false)}
-              className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-white/10 flex items-center justify-center text-slate-500 hover:text-slate-300 transition-colors"
+              className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-white/10 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-colors"
             >
               <X size={8} />
             </button>
             <div className="hidden sm:block space-y-1">
               <div className="flex items-center gap-2">
-                <Mouse size={10} className="flex-shrink-0 text-slate-600" />
+                <Mouse size={10} className="flex-shrink-0 text-slate-400" />
                 <span>左键旋转 · 右键平移 · 滚轮缩放</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="w-[10px] text-center flex-shrink-0 text-cyan-500">+</span>
+                <span className="w-[10px] text-center flex-shrink-0 text-cyan-400">+</span>
                 <span>点击骨骼选择 · 再次点击取消</span>
               </div>
             </div>
             <div className="sm:hidden space-y-1">
               <div className="flex items-center gap-2">
-                <Smartphone size={10} className="flex-shrink-0 text-slate-600" />
-                <span>单指旋转 · 双指缩放/平移</span>
+                <Smartphone size={10} className="flex-shrink-0 text-slate-400" />
+                <span>单指旋转 · 双指缩放/平移 · 点击选中</span>
               </div>
             </div>
           </div>
