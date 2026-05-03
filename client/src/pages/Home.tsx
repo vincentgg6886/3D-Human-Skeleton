@@ -1,7 +1,7 @@
 /*
  * Home.tsx - Main application page
- * Design: Full-screen 3D viewport with L-shaped control console
- * Mobile: Bottom tab bar replaces left toolbar, overlay side panel
+ * V1.1: Onboarding dialog, branded loading screen
+ * V1.2: Refined layout and visual hierarchy
  */
 
 import { Suspense } from 'react';
@@ -13,40 +13,40 @@ import ControlsHint from '@/components/ui/ControlsHint';
 import ViewPresets from '@/components/ui/ViewPresets';
 import QuickRegionSelector from '@/components/ui/QuickRegionSelector';
 import MobileNav from '@/components/ui/MobileNav';
-import { Loader2, Move3d } from 'lucide-react';
-import { motion } from 'framer-motion';
+import OnboardingDialog from '@/components/ui/OnboardingDialog';
+import LoadingScreen from '@/components/ui/LoadingScreen';
+import { useState, useEffect } from 'react';
 
 function LoadingFallback() {
-  return (
-    <div
-      className="w-full h-full flex flex-col items-center justify-center"
-      style={{ background: 'linear-gradient(180deg, #0A0E17 0%, #0D1220 50%, #101828 100%)' }}
-    >
-      <motion.div
-        initial={{ scale: 0.8, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ duration: 0.5 }}
-        className="w-20 h-20 rounded-2xl bg-gradient-to-br from-cyan-400/20 to-blue-600/20 flex items-center justify-center mb-6 border border-cyan-400/20"
-      >
-        <Move3d size={32} className="text-cyan-400 animate-pulse" />
-      </motion.div>
-      <div className="flex items-center gap-2 mb-2">
-        <Loader2 size={14} className="text-cyan-400 animate-spin" />
-        <p className="text-sm text-slate-300 font-medium">加载3D骨骼模型</p>
-      </div>
-      <p className="text-[10px] text-slate-600 font-mono tracking-wider">Initializing WebGL renderer...</p>
+  const [progress, setProgress] = useState(0);
+  const [stage, setStage] = useState('初始化 WebGL 渲染器...');
 
-      {/* Loading progress bar */}
-      <div className="mt-6 w-48 h-0.5 rounded-full bg-white/5 overflow-hidden">
-        <motion.div
-          initial={{ width: '0%' }}
-          animate={{ width: '100%' }}
-          transition={{ duration: 2, ease: 'easeInOut' }}
-          className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-blue-500"
-        />
-      </div>
-    </div>
-  );
+  useEffect(() => {
+    const stages = [
+      { at: 15, text: '加载骨骼模型数据...' },
+      { at: 40, text: '解析解剖学结构...' },
+      { at: 65, text: '构建3D网格...' },
+      { at: 85, text: '加载肌肉模型...' },
+      { at: 95, text: '准备交互系统...' },
+    ];
+
+    const timer = setInterval(() => {
+      setProgress((prev) => {
+        const next = prev + Math.random() * 3 + 0.5;
+        if (next >= 98) {
+          clearInterval(timer);
+          return 98;
+        }
+        const s = stages.find((s) => prev < s.at && next >= s.at);
+        if (s) setStage(s.text);
+        return next;
+      });
+    }, 100);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  return <LoadingScreen progress={Math.round(progress)} stage={stage} />;
 }
 
 export default function Home() {
@@ -71,6 +71,9 @@ export default function Home() {
 
       {/* Mobile UI */}
       <MobileNav />
+
+      {/* Onboarding - V1.1 */}
+      <OnboardingDialog />
     </div>
   );
 }

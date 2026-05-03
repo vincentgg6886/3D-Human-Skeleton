@@ -22,6 +22,16 @@ export interface RegionInfo {
   subRegions: { id: string; name: string; nameCn: string; bones: string[] }[];
 }
 
+export type JointPreset = {
+  id: string;
+  nameCn: string;
+  nameEn: string;
+  bones: string[];
+  cameraPosition: [number, number, number];
+  cameraTarget: [number, number, number];
+  description: string;
+};
+
 interface AppState {
   // Selection
   selectedBoneId: string | null;
@@ -35,15 +45,22 @@ interface AppState {
   // Display Modes
   muscleMode: boolean;
   muscleOpacity: number;
+  labelMode: boolean;        // V1.5: bone label annotations
+  xrayMode: boolean;         // X-ray transparency mode
+
+  // Joint View - V1.5
+  activeJointPreset: string | null;
 
   // Pathology Visualization
-  activePathologyIndex: number | null; // Index in BONE_PATHOLOGIES[selectedBoneId]
+  activePathologyIndex: number | null;
 
   // UI State
   sidebarOpen: boolean;
   infoPanelOpen: boolean;
   searchQuery: string;
-  activeTab: 'hierarchy' | 'info' | 'motion' | 'pathology';
+  activeTab: 'hierarchy' | 'info' | 'motion' | 'pathology' | 'joints';
+  showOnboarding: boolean;   // V1.1: first-visit onboarding
+  modelLoaded: boolean;      // V1.1: loading state tracking
 
   // View
   viewMode: 'full' | 'region';
@@ -60,7 +77,7 @@ interface AppState {
   setSidebarOpen: (open: boolean) => void;
   setInfoPanelOpen: (open: boolean) => void;
   setSearchQuery: (query: string) => void;
-  setActiveTab: (tab: 'hierarchy' | 'info' | 'motion' | 'pathology') => void;
+  setActiveTab: (tab: AppState['activeTab']) => void;
   setCameraTarget: (target: [number, number, number] | null) => void;
   setCameraPreset: (position: [number, number, number], target: [number, number, number]) => void;
   resetView: () => void;
@@ -69,14 +86,33 @@ interface AppState {
   toggleMuscleMode: () => void;
   setMuscleOpacity: (opacity: number) => void;
 
+  // Label mode
+  toggleLabelMode: () => void;
+
+  // X-ray mode
+  toggleXrayMode: () => void;
+
+  // Joint view
+  setActiveJointPreset: (id: string | null) => void;
+
   // Pathology visualization
   setActivePathology: (index: number | null) => void;
+
+  // Onboarding
+  setShowOnboarding: (show: boolean) => void;
+  setModelLoaded: (loaded: boolean) => void;
 }
 
 const ALL_REGIONS = new Set([
   'skull', 'spine', 'thorax', 'upper-limb-left', 'upper-limb-right',
   'pelvis', 'lower-limb-left', 'lower-limb-right'
 ]);
+
+// Check if user has seen onboarding before
+const hasSeenOnboarding = () => {
+  try { return localStorage.getItem('orthovis-onboarding-seen') === 'true'; }
+  catch { return false; }
+};
 
 export const useAppStore = create<AppState>((set) => ({
   selectedBoneId: null,
@@ -86,11 +122,16 @@ export const useAppStore = create<AppState>((set) => ({
   hiddenBones: new Set<string>(),
   muscleMode: false,
   muscleOpacity: 0.55,
+  labelMode: false,
+  xrayMode: false,
+  activeJointPreset: null,
   activePathologyIndex: null,
-  sidebarOpen: true,
+  sidebarOpen: false,
   infoPanelOpen: false,
   searchQuery: '',
-  activeTab: 'hierarchy' as 'hierarchy' | 'info' | 'motion' | 'pathology',
+  activeTab: 'hierarchy' as AppState['activeTab'],
+  showOnboarding: !hasSeenOnboarding(),
+  modelLoaded: false,
   viewMode: 'full',
   cameraTarget: null,
   cameraPosition: null,
@@ -99,7 +140,8 @@ export const useAppStore = create<AppState>((set) => ({
     selectedBoneId: id,
     infoPanelOpen: id !== null,
     activeTab: id !== null ? 'info' : state.activeTab,
-    activePathologyIndex: null, // Reset pathology when selecting new bone
+    activePathologyIndex: null,
+    sidebarOpen: id !== null ? true : state.sidebarOpen,
   })),
 
   hoverBone: (id) => set({ hoveredBoneId: id }),
@@ -140,7 +182,15 @@ export const useAppStore = create<AppState>((set) => ({
 
   toggleMuscleMode: () => set((state) => ({ muscleMode: !state.muscleMode })),
   setMuscleOpacity: (opacity) => set({ muscleOpacity: opacity }),
+
+  toggleLabelMode: () => set((state) => ({ labelMode: !state.labelMode })),
+  toggleXrayMode: () => set((state) => ({ xrayMode: !state.xrayMode })),
+
+  setActiveJointPreset: (id) => set({ activeJointPreset: id }),
   setActivePathology: (index) => set({ activePathologyIndex: index }),
+
+  setShowOnboarding: (show) => set({ showOnboarding: show }),
+  setModelLoaded: (loaded) => set({ modelLoaded: loaded }),
 
   resetView: () => set({
     selectedBoneId: null,
@@ -153,6 +203,9 @@ export const useAppStore = create<AppState>((set) => ({
     cameraPosition: null,
     infoPanelOpen: false,
     muscleMode: false,
+    labelMode: false,
+    xrayMode: false,
+    activeJointPreset: null,
     activePathologyIndex: null,
   }),
 }));
