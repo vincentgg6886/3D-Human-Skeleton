@@ -115,36 +115,26 @@ function InteractiveBone({ geometry, appBoneId, region, isMirror }: InteractiveB
     const mat = meshRef.current.material as THREE.MeshStandardMaterial;
     const mesh = meshRef.current;
 
-    // V2.0: Joint motion animation - apply rotation to moving bones
+    // V2.1: Joint motion animation - direct rotation on moving bones
     const motionBones = (window as any).__jointMotionBones as Set<string> | null;
     const motionAngle = (window as any).__jointMotionAngle as number || 0;
     const motionAxis = (window as any).__jointMotionAxis as 'x' | 'y' | 'z' | null;
-    const motionPivot = (window as any).__jointMotionPivot as string | null;
 
-    if (motionBones && motionBones.has(appBoneId) && motionAxis && motionAngle !== 0) {
-      // Get pivot bone position for rotation center
-      const pivotPos = motionPivot ? (window as any).__bonePositions?.[motionPivot] : null;
-      if (pivotPos) {
-        // Calculate rotation around pivot point
-        const pivotVec = new THREE.Vector3(pivotPos[0], pivotPos[1], pivotPos[2]);
-        const bonePos = (window as any).__bonePositions?.[appBoneId];
-        if (bonePos) {
-          // Apply rotation offset relative to rest pose
-          const targetRotation = motionAngle * 0.15; // Scale down for visual subtlety
-          if (motionAxis === 'x') {
-            mesh.rotation.x = THREE.MathUtils.lerp(mesh.rotation.x, targetRotation, 0.08);
-          } else if (motionAxis === 'y') {
-            mesh.rotation.y = THREE.MathUtils.lerp(mesh.rotation.y, targetRotation, 0.08);
-          } else if (motionAxis === 'z') {
-            mesh.rotation.z = THREE.MathUtils.lerp(mesh.rotation.z, targetRotation, 0.08);
-          }
-        }
+    if (motionBones && motionBones.has(appBoneId) && motionAxis) {
+      // Apply rotation directly - the angle is already in radians from JointMotionAnimator
+      const targetRotation = motionAngle;
+      if (motionAxis === 'x') {
+        mesh.rotation.x = THREE.MathUtils.lerp(mesh.rotation.x, targetRotation, 0.12);
+      } else if (motionAxis === 'y') {
+        mesh.rotation.y = THREE.MathUtils.lerp(mesh.rotation.y, targetRotation, 0.12);
+      } else if (motionAxis === 'z') {
+        mesh.rotation.z = THREE.MathUtils.lerp(mesh.rotation.z, targetRotation, 0.12);
       }
     } else if (!motionBones || !motionBones.has(appBoneId)) {
       // Smoothly return to rest pose when not animating
-      mesh.rotation.x = THREE.MathUtils.lerp(mesh.rotation.x, 0, 0.06);
-      mesh.rotation.y = THREE.MathUtils.lerp(mesh.rotation.y, 0, 0.06);
-      mesh.rotation.z = THREE.MathUtils.lerp(mesh.rotation.z, 0, 0.06);
+      mesh.rotation.x = THREE.MathUtils.lerp(mesh.rotation.x, 0, 0.1);
+      mesh.rotation.y = THREE.MathUtils.lerp(mesh.rotation.y, 0, 0.1);
+      mesh.rotation.z = THREE.MathUtils.lerp(mesh.rotation.z, 0, 0.1);
     }
 
     // Pathology effect takes highest priority
@@ -728,74 +718,58 @@ function FloorGrid() {
 }
 
 // ============================================================
-// V2.0: Joint Motion Animator - drives bone rotation for active motion
+// V2.1: Joint Motion Animator - drives bone rotation for active motion
+// Simplified: directly sets global vars that InteractiveBone reads each frame
 // ============================================================
 function JointMotionAnimator() {
   const jointMotionId = useAppStore((s) => s.jointMotionId);
   const jointMotionPlaying = useAppStore((s) => s.jointMotionPlaying);
   const jointMotionSpeed = useAppStore((s) => s.jointMotionSpeed);
   const timeRef = useRef(0);
+  const prevMotionId = useRef<string | null>(null);
 
-  // Store original rotations to restore when animation stops
-  const originalRotations = useRef<Map<string, THREE.Euler>>(new Map());
+  useFrame((_, delta) => {
+    // When motion changes, reset time
+    if (jointMotionId !== prevMotionId.current) {
+      timeRef.current = 0;
+      prevMotionId.current = jointMotionId;
+    }
 
-  useFrame((state, delta) => {
+    // Not playing or no motion selected -> clear globals so bones return to rest
     if (!jointMotionId || !jointMotionPlaying) {
-      // Reset rotations when not playing
-      if (originalRotations.current.size > 0) {
-        const scene = state.scene;
-        originalRotations.current.forEach((euler, name) => {
-          const obj = scene.getObjectByName(name);
-          if (obj) {
-            obj.rotation.x = THREE.MathUtils.lerp(obj.rotation.x, euler.x, 0.08);
-            obj.rotation.y = THREE.MathUtils.lerp(obj.rotation.y, euler.y, 0.08);
-            obj.rotation.z = THREE.MathUtils.lerp(obj.rotation.z, euler.z, 0.08);
-          }
-        });
-        // Check if all rotations are close to original
-        let allReset = true;
-        originalRotations.current.forEach((euler, name) => {
-          const obj = state.scene.getObjectByName(name);
-          if (obj) {
-            const diff = Math.abs(obj.rotation.x - euler.x) + Math.abs(obj.rotation.y - euler.y) + Math.abs(obj.rotation.z - euler.z);
-            if (diff > 0.01) allReset = false;
-          }
-        });
-        if (allReset) {
-          originalRotations.current.clear();
-          timeRef.current = 0;
-        }
-      }
+      (window as any).__jointMotionAngle = 0;
+      (window as any).__jointMotionAxis = null;
+      (window as any).__jointMotionBones = null;
       return;
     }
 
     const motion = JOINT_MOTION_MAP[jointMotionId];
-    if (!motion) return;
+    if (!motion) {
+      (window as any).__jointMotionBones = null;
+      return;
+    }
 
     timeRef.current += delta * jointMotionSpeed;
 
-    // Sinusoidal oscillation between rangeMin and rangeMax
+    // Sinusoidal oscillation - use normalized range for clear visual feedback
     const t = (Math.sin(timeRef.current * 1.5) + 1) / 2; // 0 to 1
-    const angleDeg = motion.rangeMin + (motion.rangeMax - motion.rangeMin) * t;
-    const angleRad = THREE.MathUtils.degToRad(angleDeg);
+    // Map to a visible rotation range: -25° to +25° (50° total sweep)
+    // This ensures animation is clearly visible regardless of actual ROM values
+    const visualAngleDeg = -25 + t * 50;
+    const angleRad = THREE.MathUtils.degToRad(visualAngleDeg);
 
-    // Apply rotation to moving bones via __bonePositions lookup
-    // Since we use individual mesh instances (not a scene hierarchy),
-    // we apply the rotation as a visual offset in the useFrame of InteractiveBone
-    // Store the current motion angle in a global ref for InteractiveBone to read
+    // Set globals for InteractiveBone to read
     (window as any).__jointMotionAngle = angleRad;
     (window as any).__jointMotionAxis = motion.axis;
     (window as any).__jointMotionBones = new Set(motion.movingBones);
-    (window as any).__jointMotionPivot = motion.pivotBone;
   });
 
-  // Clear motion data when component unmounts or motion stops
+  // Clear motion data when component unmounts
   useEffect(() => {
     return () => {
       (window as any).__jointMotionAngle = 0;
       (window as any).__jointMotionAxis = null;
       (window as any).__jointMotionBones = null;
-      (window as any).__jointMotionPivot = null;
     };
   }, []);
 
