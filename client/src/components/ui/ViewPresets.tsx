@@ -7,11 +7,11 @@
 import { useAppStore } from '@/lib/store';
 
 const PRESETS = [
-  { label: '前', labelEn: 'ANT', position: [0, 4, 8] as [number, number, number] },
-  { label: '后', labelEn: 'POST', position: [0, 4, -8] as [number, number, number] },
-  { label: '左', labelEn: 'LAT-L', position: [-8, 4, 0] as [number, number, number] },
-  { label: '右', labelEn: 'LAT-R', position: [8, 4, 0] as [number, number, number] },
-  { label: '上', labelEn: 'SUP', position: [0, 14, 0.1] as [number, number, number] },
+  { label: '前', labelEn: 'ANT', position: [0, 4, 10] as [number, number, number] },
+  { label: '后', labelEn: 'POST', position: [0, 4, -10] as [number, number, number] },
+  { label: '左', labelEn: 'LAT-L', position: [-10, 4, 0] as [number, number, number] },
+  { label: '右', labelEn: 'LAT-R', position: [10, 4, 0] as [number, number, number] },
+  { label: '上', labelEn: 'SUP', position: [0, 16, 0.1] as [number, number, number] },
 ];
 
 export default function ViewPresets() {

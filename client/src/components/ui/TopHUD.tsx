@@ -5,7 +5,7 @@
  */
 
 import { useAppStore } from '@/lib/store';
-import { BONE_INFO, BONE_GEOMETRIES } from '@/lib/skeletonData';
+import { BONE_INFO, TOTAL_BONE_COUNT } from '@/lib/skeletonData';
 import { BONE_PATHOLOGIES } from '@/lib/pathologyData';
 import { Crosshair, Lock, Scan, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -17,8 +17,10 @@ export default function TopHUD() {
 
   const displayBoneId = selectedBoneId || hoveredBoneId;
   const info = displayBoneId ? BONE_INFO[displayBoneId] : null;
-  const bone = displayBoneId ? BONE_GEOMETRIES.find((b) => b.id === displayBoneId) : null;
   const pathologyCount = displayBoneId ? (BONE_PATHOLOGIES[displayBoneId]?.length || 0) : 0;
+
+  // Get bone position from the global positions map
+  const bonePos = displayBoneId ? (window as any).__bonePositions?.[displayBoneId] : null;
 
   return (
     <>
@@ -66,10 +68,10 @@ export default function TopHUD() {
                 <div>
                   区域: <span className="text-slate-300">{info.regionCn}</span>
                 </div>
-                {bone && (
+                {bonePos && (
                   <div>
                     坐标: <span className="text-cyan-400/70">
-                      [{bone.position.map((v) => v.toFixed(1)).join(', ')}]
+                      [{bonePos.map((v: number) => v.toFixed(1)).join(', ')}]
                     </span>
                   </div>
                 )}
@@ -94,7 +96,7 @@ export default function TopHUD() {
         <div className="flex items-center gap-3 text-[10px] font-mono text-slate-600">
           <div className="flex items-center gap-1">
             <Scan size={10} />
-            <span>{BONE_GEOMETRIES.length} 骨骼</span>
+            <span>{TOTAL_BONE_COUNT} 骨骼</span>
           </div>
           <div className="w-px h-3 bg-white/10" />
           <span>WebGL 3D</span>
