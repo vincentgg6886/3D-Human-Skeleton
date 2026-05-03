@@ -110,31 +110,65 @@ function InteractiveBone({ geometry, appBoneId, region, isMirror }: InteractiveB
     });
   }, []);
 
+  // V2.2: Pivot group ref for anatomically correct rotation
+  const pivotGroupRef = useRef<THREE.Group>(null);
+
   useFrame((_, delta) => {
     if (!meshRef.current) return;
     const mat = meshRef.current.material as THREE.MeshStandardMaterial;
-    const mesh = meshRef.current;
 
-    // V2.1: Joint motion animation - direct rotation on moving bones
-    const motionBones = (window as any).__jointMotionBones as Set<string> | null;
-    const motionAngle = (window as any).__jointMotionAngle as number || 0;
-    const motionAxis = (window as any).__jointMotionAxis as 'x' | 'y' | 'z' | null;
+    // V2.2: Anatomically correct pivot-based rotation via parent group
+    const motionData = (window as any).__jointMotionData as {
+      angleRad: number;
+      axis: 'x' | 'y' | 'z';
+      pivotPoint: [number, number, number];
+      movingBones: Set<string>;
+    } | null;
 
-    if (motionBones && motionBones.has(appBoneId) && motionAxis) {
-      // Apply rotation directly - the angle is already in radians from JointMotionAnimator
-      const targetRotation = motionAngle;
-      if (motionAxis === 'x') {
-        mesh.rotation.x = THREE.MathUtils.lerp(mesh.rotation.x, targetRotation, 0.12);
-      } else if (motionAxis === 'y') {
-        mesh.rotation.y = THREE.MathUtils.lerp(mesh.rotation.y, targetRotation, 0.12);
-      } else if (motionAxis === 'z') {
-        mesh.rotation.z = THREE.MathUtils.lerp(mesh.rotation.z, targetRotation, 0.12);
+    if (pivotGroupRef.current) {
+      if (motionData && motionData.movingBones.has(appBoneId)) {
+        const [px, py, pz] = motionData.pivotPoint;
+        const angle = motionData.angleRad;
+
+        // Move group origin to pivot point
+        pivotGroupRef.current.position.x = THREE.MathUtils.lerp(pivotGroupRef.current.position.x, px, 0.15);
+        pivotGroupRef.current.position.y = THREE.MathUtils.lerp(pivotGroupRef.current.position.y, py, 0.15);
+        pivotGroupRef.current.position.z = THREE.MathUtils.lerp(pivotGroupRef.current.position.z, pz, 0.15);
+
+        // Apply rotation on the correct axis
+        const targetRotX = motionData.axis === 'x' ? angle : 0;
+        const targetRotY = motionData.axis === 'y' ? angle : 0;
+        const targetRotZ = motionData.axis === 'z' ? angle : 0;
+        pivotGroupRef.current.rotation.x = THREE.MathUtils.lerp(pivotGroupRef.current.rotation.x, targetRotX, 0.15);
+        pivotGroupRef.current.rotation.y = THREE.MathUtils.lerp(pivotGroupRef.current.rotation.y, targetRotY, 0.15);
+        pivotGroupRef.current.rotation.z = THREE.MathUtils.lerp(pivotGroupRef.current.rotation.z, targetRotZ, 0.15);
+
+        // Offset the mesh inside the group so it rotates around the pivot
+        // mesh world pos should be: meshPosition (the shared offset)
+        // mesh local pos inside group = meshPosition - pivotPoint
+        const mp = isMirror
+          ? [2 * MODEL_OFFSET_X, MODEL_OFFSET_Y, MODEL_OFFSET_Z]
+          : [MODEL_OFFSET_X, MODEL_OFFSET_Y, MODEL_OFFSET_Z];
+        meshRef.current.position.x = THREE.MathUtils.lerp(meshRef.current.position.x, mp[0] - px, 0.15);
+        meshRef.current.position.y = THREE.MathUtils.lerp(meshRef.current.position.y, mp[1] - py, 0.15);
+        meshRef.current.position.z = THREE.MathUtils.lerp(meshRef.current.position.z, mp[2] - pz, 0.15);
+      } else {
+        // Smoothly return group to identity (no transform)
+        pivotGroupRef.current.position.x = THREE.MathUtils.lerp(pivotGroupRef.current.position.x, 0, 0.1);
+        pivotGroupRef.current.position.y = THREE.MathUtils.lerp(pivotGroupRef.current.position.y, 0, 0.1);
+        pivotGroupRef.current.position.z = THREE.MathUtils.lerp(pivotGroupRef.current.position.z, 0, 0.1);
+        pivotGroupRef.current.rotation.x = THREE.MathUtils.lerp(pivotGroupRef.current.rotation.x, 0, 0.1);
+        pivotGroupRef.current.rotation.y = THREE.MathUtils.lerp(pivotGroupRef.current.rotation.y, 0, 0.1);
+        pivotGroupRef.current.rotation.z = THREE.MathUtils.lerp(pivotGroupRef.current.rotation.z, 0, 0.1);
+
+        // Return mesh to its original local position (0,0,0 inside group at identity)
+        const mp = isMirror
+          ? [2 * MODEL_OFFSET_X, MODEL_OFFSET_Y, MODEL_OFFSET_Z]
+          : [MODEL_OFFSET_X, MODEL_OFFSET_Y, MODEL_OFFSET_Z];
+        meshRef.current.position.x = THREE.MathUtils.lerp(meshRef.current.position.x, mp[0], 0.1);
+        meshRef.current.position.y = THREE.MathUtils.lerp(meshRef.current.position.y, mp[1], 0.1);
+        meshRef.current.position.z = THREE.MathUtils.lerp(meshRef.current.position.z, mp[2], 0.1);
       }
-    } else if (!motionBones || !motionBones.has(appBoneId)) {
-      // Smoothly return to rest pose when not animating
-      mesh.rotation.x = THREE.MathUtils.lerp(mesh.rotation.x, 0, 0.1);
-      mesh.rotation.y = THREE.MathUtils.lerp(mesh.rotation.y, 0, 0.1);
-      mesh.rotation.z = THREE.MathUtils.lerp(mesh.rotation.z, 0, 0.1);
     }
 
     // Pathology effect takes highest priority
@@ -246,18 +280,20 @@ function InteractiveBone({ geometry, appBoneId, region, isMirror }: InteractiveB
     : [MODEL_SCALE, MODEL_SCALE, MODEL_SCALE];
 
   return (
-    <mesh
-      ref={meshRef}
-      geometry={geometry}
-      material={material}
-      position={meshPosition}
-      scale={meshScale}
-      onClick={handleClick}
-      onPointerOver={handlePointerOver}
-      onPointerOut={handlePointerOut}
-      castShadow
-      receiveShadow
-    />
+    <group ref={pivotGroupRef}>
+      <mesh
+        ref={meshRef}
+        geometry={geometry}
+        material={material}
+        position={meshPosition}
+        scale={meshScale}
+        onClick={handleClick}
+        onPointerOver={handlePointerOver}
+        onPointerOut={handlePointerOut}
+        castShadow
+        receiveShadow
+      />
+    </group>
   );
 }
 
@@ -718,8 +754,8 @@ function FloorGrid() {
 }
 
 // ============================================================
-// V2.1: Joint Motion Animator - drives bone rotation for active motion
-// Simplified: directly sets global vars that InteractiveBone reads each frame
+// V2.2: Joint Motion Animator - Anatomically correct pivot-based rotation
+// Uses matrix transforms to rotate bones around the actual joint pivot point
 // ============================================================
 function JointMotionAnimator() {
   const jointMotionId = useAppStore((s) => s.jointMotionId);
@@ -735,41 +771,62 @@ function JointMotionAnimator() {
       prevMotionId.current = jointMotionId;
     }
 
-    // Not playing or no motion selected -> clear globals so bones return to rest
+    // Not playing or no motion selected -> signal bones to return to rest
     if (!jointMotionId || !jointMotionPlaying) {
-      (window as any).__jointMotionAngle = 0;
-      (window as any).__jointMotionAxis = null;
-      (window as any).__jointMotionBones = null;
+      (window as any).__jointMotionData = null;
       return;
     }
 
     const motion = JOINT_MOTION_MAP[jointMotionId];
     if (!motion) {
-      (window as any).__jointMotionBones = null;
+      (window as any).__jointMotionData = null;
       return;
     }
 
+    // Get pivot bone position from stored bone centers
+    const bonePositions = (window as any).__bonePositions as Record<string, [number, number, number]> | null;
+    if (!bonePositions) {
+      (window as any).__jointMotionData = null;
+      return;
+    }
+
+    const pivotPos = bonePositions[motion.pivotBone];
+    const movingBonePos = bonePositions[motion.movingBones[0]];
+    if (!pivotPos || !movingBonePos) {
+      (window as any).__jointMotionData = null;
+      return;
+    }
+
+    // Calculate the joint pivot point:
+    // It's between the pivot bone and the first moving bone
+    // For 'distal' end: pivot point is closer to the moving bone (bottom/outer end of pivot bone)
+    // For 'proximal' end: pivot point is closer to the body center (top/inner end of pivot bone)
+    const pivotPoint: [number, number, number] = [
+      (pivotPos[0] + movingBonePos[0]) / 2,
+      (pivotPos[1] + movingBonePos[1]) / 2,
+      (pivotPos[2] + movingBonePos[2]) / 2,
+    ];
+
     timeRef.current += delta * jointMotionSpeed;
 
-    // Sinusoidal oscillation - use normalized range for clear visual feedback
-    const t = (Math.sin(timeRef.current * 1.5) + 1) / 2; // 0 to 1
-    // Map to a visible rotation range: -25° to +25° (50° total sweep)
-    // This ensures animation is clearly visible regardless of actual ROM values
-    const visualAngleDeg = -25 + t * 50;
-    const angleRad = THREE.MathUtils.degToRad(visualAngleDeg);
+    // Sinusoidal oscillation within the visual range
+    const t = Math.sin(timeRef.current * 1.5); // -1 to 1
+    const angleDeg = t * motion.visualRange;
+    const angleRad = THREE.MathUtils.degToRad(angleDeg);
 
-    // Set globals for InteractiveBone to read
-    (window as any).__jointMotionAngle = angleRad;
-    (window as any).__jointMotionAxis = motion.axis;
-    (window as any).__jointMotionBones = new Set(motion.movingBones);
+    // Set global data for InteractiveBone to read
+    (window as any).__jointMotionData = {
+      angleRad,
+      axis: motion.axis,
+      pivotPoint,
+      movingBones: new Set(motion.movingBones),
+    };
   });
 
   // Clear motion data when component unmounts
   useEffect(() => {
     return () => {
-      (window as any).__jointMotionAngle = 0;
-      (window as any).__jointMotionAxis = null;
-      (window as any).__jointMotionBones = null;
+      (window as any).__jointMotionData = null;
     };
   }, []);
 
