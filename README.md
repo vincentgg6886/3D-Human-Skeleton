@@ -21,6 +21,18 @@
 
 ---
 
+## 预览截图
+
+<p align="center">
+  <img src="https://files.manuscdn.com/user_upload_by_module/session_file/309927823320059311/zFekwcQLVmVfDnGC.png" alt="OrthoVis 3D 主界面 - 3D骨骼模型与解剖层级导航" width="800" />
+</p>
+
+<p align="center">
+  <img src="https://files.manuscdn.com/user_upload_by_module/session_file/309927823320059311/pdufycdGjrzhTWkq.png" alt="OrthoVis 3D 新手引导" width="800" />
+</p>
+
+---
+
 ## 项目简介
 
 OrthoVis 3D 是一个基于 WebGL 的人体骨骼3D交互可视化系统，支持全身 **252 块骨骼** 的自由旋转、缩放、区域锁定查看、骨骼选择高亮、解剖层级导航、关节运动学模拟等功能。采用高级暗色调医疗级视觉设计，适用于骨科教学、临床参考和医学科普。
