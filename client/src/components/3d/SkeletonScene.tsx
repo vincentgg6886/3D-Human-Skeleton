@@ -484,6 +484,8 @@ function SkeletonModel() {
   const bones = useMemo(() => {
     const result: { geometry: THREE.BufferGeometry; appBoneId: string; region: string; isMirror: boolean; center: [number, number, number] }[] = [];
     const bonePositions: Record<string, [number, number, number]> = {};
+    // V2.3: Store full bounding box data for accurate joint pivot calculation
+    const boneBounds: Record<string, { min: [number, number, number]; max: [number, number, number]; center: [number, number, number] }> = {};
 
     scene.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;
@@ -503,12 +505,30 @@ function SkeletonModel() {
         center.z * MODEL_SCALE + MODEL_OFFSET_Z,
       ];
 
+      // V2.3: Compute scaled bounding box min/max for joint pivot calculation
+      const bbMin = geo.boundingBox!.min;
+      const bbMax = geo.boundingBox!.max;
+      const scaledMin: [number, number, number] = [
+        bbMin.x * MODEL_SCALE + MODEL_OFFSET_X,
+        bbMin.y * MODEL_SCALE + MODEL_OFFSET_Y,
+        bbMin.z * MODEL_SCALE + MODEL_OFFSET_Z,
+      ];
+      const scaledMax: [number, number, number] = [
+        bbMax.x * MODEL_SCALE + MODEL_OFFSET_X,
+        bbMax.y * MODEL_SCALE + MODEL_OFFSET_Y,
+        bbMax.z * MODEL_SCALE + MODEL_OFFSET_Z,
+      ];
+
       result.push({ geometry: geo, appBoneId: mapping.appBoneId, region: mapping.region, isMirror: false, center: scaledCenter });
       bonePositions[mapping.appBoneId] = scaledCenter;
+      boneBounds[mapping.appBoneId] = { min: scaledMin, max: scaledMax, center: scaledCenter };
 
       if (mapping.mirror && mapping.mirrorAppBoneId) {
         const leftRegion = mapping.region.replace('-right', '-left');
         const mirroredCenter: [number, number, number] = [2 * MODEL_OFFSET_X - scaledCenter[0], scaledCenter[1], scaledCenter[2]];
+        // Mirror the bounding box: flip X around MODEL_OFFSET_X
+        const mirroredMin: [number, number, number] = [2 * MODEL_OFFSET_X - scaledMax[0], scaledMin[1], scaledMin[2]];
+        const mirroredMax: [number, number, number] = [2 * MODEL_OFFSET_X - scaledMin[0], scaledMax[1], scaledMax[2]];
         result.push({
           geometry: geo,
           appBoneId: mapping.mirrorAppBoneId,
@@ -517,10 +537,12 @@ function SkeletonModel() {
           center: mirroredCenter,
         });
         bonePositions[mapping.mirrorAppBoneId] = mirroredCenter;
+        boneBounds[mapping.mirrorAppBoneId] = { min: mirroredMin, max: mirroredMax, center: mirroredCenter };
       }
     });
 
     (window as any).__bonePositions = bonePositions;
+    (window as any).__boneBounds = boneBounds;
     return result;
   }, [scene]);
 
@@ -783,29 +805,48 @@ function JointMotionAnimator() {
       return;
     }
 
-    // Get pivot bone position from stored bone centers
-    const bonePositions = (window as any).__bonePositions as Record<string, [number, number, number]> | null;
-    if (!bonePositions) {
+    // V2.3: Get bone bounding box data for accurate joint pivot calculation
+    const boneBounds = (window as any).__boneBounds as Record<string, { min: [number, number, number]; max: [number, number, number]; center: [number, number, number] }> | null;
+    if (!boneBounds) {
       (window as any).__jointMotionData = null;
       return;
     }
 
-    const pivotPos = bonePositions[motion.pivotBone];
-    const movingBonePos = bonePositions[motion.movingBones[0]];
-    if (!pivotPos || !movingBonePos) {
+    const pivotBounds = boneBounds[motion.pivotBone];
+    const movingBounds = boneBounds[motion.movingBones[0]];
+    if (!pivotBounds || !movingBounds) {
       (window as any).__jointMotionData = null;
       return;
     }
 
-    // Calculate the joint pivot point:
-    // It's between the pivot bone and the first moving bone
-    // For 'distal' end: pivot point is closer to the moving bone (bottom/outer end of pivot bone)
-    // For 'proximal' end: pivot point is closer to the body center (top/inner end of pivot bone)
-    const pivotPoint: [number, number, number] = [
-      (pivotPos[0] + movingBonePos[0]) / 2,
-      (pivotPos[1] + movingBonePos[1]) / 2,
-      (pivotPos[2] + movingBonePos[2]) / 2,
-    ];
+    // V2.3: Calculate the joint pivot point using the ENDPOINT of the pivot bone
+    // that is closest to the moving bone, NOT the geometric center.
+    // 
+    // For long bones oriented vertically (Y axis):
+    //   'distal' = lower end (min Y) for upper limb bones, or the end closer to the moving bone
+    //   'proximal' = upper end (max Y), closer to the body center
+    //
+    // Strategy: find which endpoint of the pivot bone's bounding box is closest
+    // to the moving bone's center. That endpoint IS the joint surface.
+    const pivotMin = pivotBounds.min;
+    const pivotMax = pivotBounds.max;
+    const movingCenter = movingBounds.center;
+
+    // Test both Y-endpoints of the pivot bone to find which is closer to the moving bone
+    // Use the X,Z of the pivot center (joint is roughly along the bone's long axis)
+    const pivotCx = pivotBounds.center[0];
+    const pivotCz = pivotBounds.center[2];
+
+    // Bottom endpoint of pivot bone
+    const bottomEnd: [number, number, number] = [pivotCx, pivotMin[1], pivotCz];
+    // Top endpoint of pivot bone  
+    const topEnd: [number, number, number] = [pivotCx, pivotMax[1], pivotCz];
+
+    const distBottom = Math.abs(bottomEnd[1] - movingCenter[1]) + Math.abs(bottomEnd[0] - movingCenter[0]) * 0.3;
+    const distTop = Math.abs(topEnd[1] - movingCenter[1]) + Math.abs(topEnd[0] - movingCenter[0]) * 0.3;
+
+    // The joint pivot is the endpoint of the pivot bone closest to the moving bone
+    const pivotPoint: [number, number, number] = distBottom < distTop ? bottomEnd : topEnd;
 
     timeRef.current += delta * jointMotionSpeed;
 

@@ -49,7 +49,7 @@ export const JOINT_MOTION_DATA: JointMotion[] = [
     movingBones: ['humerus-right', 'radius-right', 'ulna-right'],
     pivotBone: 'scapula-right',
     pivotEnd: 'distal',  // glenoid is at the lateral (distal) end of scapula
-    visualRange: 30,
+    visualRange: 20,
   },
   {
     id: 'shoulder-right-abduction',
@@ -62,7 +62,7 @@ export const JOINT_MOTION_DATA: JointMotion[] = [
     movingBones: ['humerus-right', 'radius-right', 'ulna-right'],
     pivotBone: 'scapula-right',
     pivotEnd: 'distal',
-    visualRange: 30,
+    visualRange: 20,
   },
   {
     id: 'shoulder-left-flexion',
@@ -75,7 +75,7 @@ export const JOINT_MOTION_DATA: JointMotion[] = [
     movingBones: ['humerus-left', 'radius-left', 'ulna-left'],
     pivotBone: 'scapula-left',
     pivotEnd: 'distal',
-    visualRange: 30,
+    visualRange: 20,
   },
   {
     id: 'shoulder-left-abduction',
@@ -88,7 +88,7 @@ export const JOINT_MOTION_DATA: JointMotion[] = [
     movingBones: ['humerus-left', 'radius-left', 'ulna-left'],
     pivotBone: 'scapula-left',
     pivotEnd: 'distal',
-    visualRange: 30,
+    visualRange: 20,
   },
 
   // ══════════════════════════════════════════
@@ -107,7 +107,7 @@ export const JOINT_MOTION_DATA: JointMotion[] = [
     movingBones: ['radius-right', 'ulna-right'],
     pivotBone: 'humerus-right',
     pivotEnd: 'distal',  // elbow is at the distal end of humerus
-    visualRange: 35,
+    visualRange: 25,
   },
   {
     id: 'elbow-right-pronation',
@@ -133,7 +133,7 @@ export const JOINT_MOTION_DATA: JointMotion[] = [
     movingBones: ['radius-left', 'ulna-left'],
     pivotBone: 'humerus-left',
     pivotEnd: 'distal',
-    visualRange: 35,
+    visualRange: 25,
   },
   {
     id: 'elbow-left-pronation',
@@ -165,7 +165,7 @@ export const JOINT_MOTION_DATA: JointMotion[] = [
     movingBones: ['femur-right', 'tibia-right', 'fibula-right', 'patella-right'],
     pivotBone: 'hip-bone-right',
     pivotEnd: 'distal',  // acetabulum is at the inferior-lateral end
-    visualRange: 25,
+    visualRange: 18,
   },
   {
     id: 'hip-right-abduction',
@@ -178,7 +178,7 @@ export const JOINT_MOTION_DATA: JointMotion[] = [
     movingBones: ['femur-right', 'tibia-right', 'fibula-right', 'patella-right'],
     pivotBone: 'hip-bone-right',
     pivotEnd: 'distal',
-    visualRange: 20,
+    visualRange: 15,
   },
   {
     id: 'hip-left-flexion',
@@ -191,7 +191,7 @@ export const JOINT_MOTION_DATA: JointMotion[] = [
     movingBones: ['femur-left', 'tibia-left', 'fibula-left', 'patella-left'],
     pivotBone: 'hip-bone-left',
     pivotEnd: 'distal',
-    visualRange: 25,
+    visualRange: 18,
   },
   {
     id: 'hip-left-abduction',
@@ -204,7 +204,7 @@ export const JOINT_MOTION_DATA: JointMotion[] = [
     movingBones: ['femur-left', 'tibia-left', 'fibula-left', 'patella-left'],
     pivotBone: 'hip-bone-left',
     pivotEnd: 'distal',
-    visualRange: 20,
+    visualRange: 15,
   },
 
   // ══════════════════════════════════════════
@@ -223,7 +223,7 @@ export const JOINT_MOTION_DATA: JointMotion[] = [
     movingBones: ['tibia-right', 'fibula-right', 'patella-right'],
     pivotBone: 'femur-right',
     pivotEnd: 'distal',  // knee is at the distal end of femur
-    visualRange: 30,
+    visualRange: 20,
   },
   {
     id: 'knee-left-flexion',
@@ -236,7 +236,7 @@ export const JOINT_MOTION_DATA: JointMotion[] = [
     movingBones: ['tibia-left', 'fibula-left', 'patella-left'],
     pivotBone: 'femur-left',
     pivotEnd: 'distal',
-    visualRange: 30,
+    visualRange: 20,
   },
 ];
 
