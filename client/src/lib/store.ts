@@ -152,8 +152,10 @@ export const useAppStore = create<AppState>((set) => ({
   selectBone: (id) => set((state) => ({
     selectedBoneId: id,
     infoPanelOpen: id !== null,
-    activeTab: id !== null ? 'info' : state.activeTab,
+    // V2.1: Don't force tab switch - only switch to info if sidebar is not open yet
+    activeTab: id !== null && !state.sidebarOpen ? 'info' : state.activeTab,
     activePathologyIndex: null,
+    // Only auto-open sidebar on desktop (mobile users control it manually)
     sidebarOpen: id !== null ? true : state.sidebarOpen,
   })),
 

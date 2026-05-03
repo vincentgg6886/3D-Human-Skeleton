@@ -1,9 +1,10 @@
 /*
  * MobileNav.tsx - Mobile bottom navigation + view controls
- * V2.0: Full-featured mobile experience
- *   - Primary nav bar with core tabs
- *   - Expandable "more" tray for toggles + view presets + region selector
- *   - Swipe-up gesture via Drawer for side panel content
+ * V2.1: Full mobile-first experience
+ *   - Larger touch targets (min 44px)
+ *   - Direct motion play/pause from nav bar when active
+ *   - Expandable tray with view presets + region selector + mode toggles
+ *   - Clear visual feedback for active states
  */
 
 import { useState } from 'react';
@@ -18,16 +19,17 @@ import {
   Tag,
   Bone,
   Scan,
-  MoreHorizontal,
   X,
   ChevronUp,
-  Focus,
   Eye,
   Move3d,
+  Focus,
+  Play,
+  Pause,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-/* ── Mobile Tab Button ── */
+/* ── Mobile Tab Button - min 44px touch target ── */
 function MobileTabButton({
   icon: Icon,
   label,
@@ -40,7 +42,7 @@ function MobileTabButton({
   label: string;
   active: boolean;
   onClick: () => void;
-  variant?: 'default' | 'muscle' | 'accent' | 'xray' | 'label';
+  variant?: 'default' | 'muscle' | 'accent' | 'xray' | 'label' | 'motion';
   badge?: boolean;
 }) {
   const activeClassMap: Record<string, string> = {
@@ -49,39 +51,32 @@ function MobileTabButton({
     accent: 'text-amber-400',
     xray: 'text-blue-400',
     label: 'text-emerald-400',
+    motion: 'text-cyan-400',
   };
 
   return (
     <button
       onClick={onClick}
-      className={`relative flex flex-col items-center gap-0.5 px-2.5 py-1.5 rounded-lg transition-all duration-200 ${
+      className={`relative flex flex-col items-center justify-center gap-0.5 min-w-[44px] min-h-[44px] px-2 py-1 rounded-lg transition-all duration-200 ${
         active ? activeClassMap[variant] : 'text-slate-500 active:text-slate-300'
       }`}
     >
       {/* Active indicator dot for toggles */}
-      {badge && (
-        <div className={`absolute top-0.5 right-1 w-[5px] h-[5px] rounded-full transition-all ${
-          active
-            ? `bg-current shadow-[0_0_4px_currentColor]`
-            : 'bg-slate-600/40'
-        }`} />
+      {badge && active && (
+        <div className={`absolute top-0.5 right-1.5 w-[6px] h-[6px] rounded-full bg-current shadow-[0_0_6px_currentColor]`} />
       )}
-      <Icon size={18} strokeWidth={1.5} />
-      <span className="text-[9px] font-medium">{label}</span>
+      <Icon size={20} strokeWidth={1.5} />
+      <span className="text-[9px] font-medium leading-tight">{label}</span>
     </button>
   );
 }
 
 /* ── View Preset Button ── */
-function PresetButton({ label, onClick, active }: { label: string; onClick: () => void; active?: boolean }) {
+function PresetButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className={`w-9 h-9 rounded-lg flex items-center justify-center text-[12px] font-semibold transition-all duration-200 ${
-        active
-          ? 'bg-cyan-400/15 text-cyan-400 border border-cyan-400/25'
-          : 'bg-white/[0.04] text-slate-400 border border-white/6 active:bg-white/8'
-      }`}
+      className="w-10 h-10 rounded-lg flex items-center justify-center text-[13px] font-semibold bg-white/[0.04] text-slate-300 border border-white/6 active:bg-cyan-400/15 active:text-cyan-400 active:border-cyan-400/25 transition-all duration-150"
     >
       {label}
     </button>
@@ -93,7 +88,7 @@ function RegionButton({ label, active, onClick }: { label: string; active: boole
   return (
     <button
       onClick={onClick}
-      className={`px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all duration-200 whitespace-nowrap ${
+      className={`px-3 py-2 rounded-lg text-[11px] font-medium transition-all duration-200 whitespace-nowrap ${
         active
           ? 'bg-cyan-400/12 text-cyan-300 border border-cyan-400/25'
           : 'bg-white/[0.04] text-slate-400 border border-white/6 active:bg-white/8'
@@ -138,6 +133,9 @@ export default function MobileNav() {
   const setCameraPreset = useAppStore((s) => s.setCameraPreset);
   const lockedRegionId = useAppStore((s) => s.lockedRegionId);
   const lockRegion = useAppStore((s) => s.lockRegion);
+  const jointMotionPlaying = useAppStore((s) => s.jointMotionPlaying);
+  const jointMotionId = useAppStore((s) => s.jointMotionId);
+  const setJointMotionPlaying = useAppStore((s) => s.setJointMotionPlaying);
   const [moreOpen, setMoreOpen] = useState(false);
 
   const handleTabClick = (tab: 'hierarchy' | 'info' | 'motion' | 'pathology' | 'joints') => {
@@ -153,7 +151,7 @@ export default function MobileNav() {
   return (
     <>
       {/* Mobile bottom nav - only visible on small screens */}
-      <div className="sm:hidden absolute bottom-0 left-0 right-0 z-40 glass-strong border-t border-white/5">
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 glass-strong border-t border-white/8">
         {/* Expandable more tray */}
         <AnimatePresence>
           {moreOpen && (
@@ -164,14 +162,14 @@ export default function MobileNav() {
               transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
               className="overflow-hidden border-b border-white/5"
             >
-              <div className="px-3 py-3 space-y-3">
+              <div className="px-4 py-4 space-y-4">
                 {/* Display mode toggles */}
                 <div>
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <Eye size={10} className="text-slate-500" />
-                    <span className="text-[9px] font-mono text-slate-500 uppercase tracking-wider">显示模式</span>
+                  <div className="flex items-center gap-1.5 mb-2.5">
+                    <Eye size={11} className="text-slate-500" />
+                    <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">显示模式</span>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-3">
                     <MobileTabButton
                       icon={Heart}
                       label="肌肉"
@@ -196,17 +194,11 @@ export default function MobileNav() {
                       variant="label"
                       badge
                     />
-                    <MobileTabButton
-                      icon={Activity}
-                      label="运动"
-                      active={activeTab === 'motion' && sidebarOpen}
-                      onClick={() => handleTabClick('motion')}
-                    />
                     <button
                       onClick={() => { resetView(); setMoreOpen(false); }}
-                      className="flex flex-col items-center gap-0.5 px-2.5 py-1.5 rounded-lg text-slate-500 active:text-slate-300 transition-all"
+                      className="flex flex-col items-center justify-center gap-0.5 min-w-[44px] min-h-[44px] px-2 py-1 rounded-lg text-slate-500 active:text-slate-300 transition-all"
                     >
-                      <RotateCcw size={18} strokeWidth={1.5} />
+                      <RotateCcw size={20} strokeWidth={1.5} />
                       <span className="text-[9px] font-medium">重置</span>
                     </button>
                   </div>
@@ -214,16 +206,19 @@ export default function MobileNav() {
 
                 {/* View presets */}
                 <div>
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <Move3d size={10} className="text-slate-500" />
-                    <span className="text-[9px] font-mono text-slate-500 uppercase tracking-wider">视角预设</span>
+                  <div className="flex items-center gap-1.5 mb-2.5">
+                    <Move3d size={11} className="text-slate-500" />
+                    <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">视角预设</span>
                   </div>
-                  <div className="flex gap-1.5">
+                  <div className="flex gap-2">
                     {VIEW_PRESETS.map((preset) => (
                       <PresetButton
                         key={preset.label}
                         label={preset.label}
-                        onClick={() => setCameraPreset(preset.position, [0, 4, 0])}
+                        onClick={() => {
+                          setCameraPreset(preset.position, [0, 4, 0]);
+                          setMoreOpen(false);
+                        }}
                       />
                     ))}
                   </div>
@@ -231,17 +226,20 @@ export default function MobileNav() {
 
                 {/* Region selector */}
                 <div>
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <Focus size={10} className="text-slate-500" />
-                    <span className="text-[9px] font-mono text-slate-500 uppercase tracking-wider">区域聚焦</span>
+                  <div className="flex items-center gap-1.5 mb-2.5">
+                    <Focus size={11} className="text-slate-500" />
+                    <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">区域聚焦</span>
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-2">
                     {REGIONS.map((region) => (
                       <RegionButton
                         key={region.id}
                         label={region.label}
                         active={lockedRegionId === region.id}
-                        onClick={() => lockRegion(lockedRegionId === region.id ? null : region.id)}
+                        onClick={() => {
+                          lockRegion(lockedRegionId === region.id ? null : region.id);
+                          setMoreOpen(false);
+                        }}
                       />
                     ))}
                   </div>
@@ -251,8 +249,8 @@ export default function MobileNav() {
           )}
         </AnimatePresence>
 
-        {/* Primary nav bar */}
-        <div className="flex items-center justify-around px-1 py-1 safe-area-bottom">
+        {/* Primary nav bar - 5 main buttons */}
+        <div className="flex items-center justify-around px-1 py-1.5 safe-area-bottom">
           <MobileTabButton
             icon={Layers}
             label="层级"
@@ -272,38 +270,51 @@ export default function MobileNav() {
             onClick={() => handleTabClick('joints')}
             variant="accent"
           />
-          <MobileTabButton
-            icon={Stethoscope}
-            label="病症"
-            active={activeTab === 'pathology' && sidebarOpen}
-            onClick={() => handleTabClick('pathology')}
-          />
+
+          {/* Motion / Play-Pause button - context-aware */}
+          {jointMotionId ? (
+            <MobileTabButton
+              icon={jointMotionPlaying ? Pause : Play}
+              label={jointMotionPlaying ? '暂停' : '播放'}
+              active={jointMotionPlaying}
+              onClick={() => setJointMotionPlaying(!jointMotionPlaying)}
+              variant="motion"
+              badge={jointMotionPlaying}
+            />
+          ) : (
+            <MobileTabButton
+              icon={Activity}
+              label="运动"
+              active={activeTab === 'motion' && sidebarOpen}
+              onClick={() => handleTabClick('motion')}
+            />
+          )}
 
           {/* More menu button */}
           <button
             onClick={() => setMoreOpen(!moreOpen)}
-            className={`flex flex-col items-center gap-0.5 px-2.5 py-1.5 rounded-lg transition-all duration-200 ${
+            className={`flex flex-col items-center justify-center gap-0.5 min-w-[44px] min-h-[44px] px-2 py-1 rounded-lg transition-all duration-200 ${
               moreOpen ? 'text-cyan-400' : 'text-slate-500 active:text-slate-300'
             }`}
           >
             {moreOpen ? (
-              <X size={18} strokeWidth={1.5} />
+              <X size={20} strokeWidth={1.5} />
             ) : (
-              <ChevronUp size={18} strokeWidth={1.5} />
+              <ChevronUp size={20} strokeWidth={1.5} />
             )}
             <span className="text-[9px] font-medium">{moreOpen ? '收起' : '更多'}</span>
           </button>
         </div>
       </div>
 
-      {/* Mobile sidebar overlay */}
+      {/* Mobile sidebar overlay - tap to close */}
       <AnimatePresence>
         {sidebarOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="sm:hidden fixed inset-0 bg-black/40 z-[35]"
+            className="sm:hidden fixed inset-0 bg-black/50 z-[25]"
             onClick={() => setSidebarOpen(false)}
           />
         )}

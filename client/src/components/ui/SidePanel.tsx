@@ -1,6 +1,9 @@
 /*
  * SidePanel.tsx - Right side information panel
- * V2.0: Improved mobile height, contrast fixes, joint motion animation controls
+ * V2.1: Mobile-first fixes
+ *   - Region controls always visible on mobile (no hover dependency)
+ *   - Panel positioned above mobile nav bar properly
+ *   - Motion tab accessible without losing joint context
  */
 
 import { useMemo, useState } from 'react';
@@ -102,18 +105,18 @@ function HierarchyTab() {
                   {region.bones.length}
                 </span>
 
-                {/* Region controls */}
+                {/* Region controls - ALWAYS visible on mobile, hover on desktop */}
                 <button
                   onClick={(e) => { e.stopPropagation(); toggleRegionVisibility(region.id); }}
-                  className="opacity-0 group-hover:opacity-100 p-0.5 transition-opacity"
+                  className="sm:opacity-0 sm:group-hover:opacity-100 p-1 transition-opacity rounded-md active:bg-white/10"
                 >
-                  {isVisible ? <Eye size={11} className="text-slate-400" /> : <EyeOff size={11} className="text-slate-500" />}
+                  {isVisible ? <Eye size={13} className="text-slate-400" /> : <EyeOff size={13} className="text-slate-500" />}
                 </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); lockRegion(isLocked ? null : region.id); }}
-                  className="opacity-0 group-hover:opacity-100 p-0.5 transition-opacity"
+                  className="sm:opacity-0 sm:group-hover:opacity-100 p-1 transition-opacity rounded-md active:bg-white/10"
                 >
-                  {isLocked ? <Unlock size={11} className="text-cyan-400" /> : <Lock size={11} className="text-slate-400" />}
+                  {isLocked ? <Unlock size={13} className="text-cyan-400" /> : <Lock size={13} className="text-slate-400" />}
                 </button>
               </div>
 
@@ -136,10 +139,10 @@ function HierarchyTab() {
                           <button
                             key={boneId}
                             onClick={() => selectBone(isSelected ? null : boneId)}
-                            className={`w-full text-left px-2 py-1.5 rounded-md text-[11px] transition-all duration-150 ${
+                            className={`w-full text-left px-2.5 py-2 rounded-md text-[12px] transition-all duration-150 ${
                               isSelected
                                 ? 'bg-cyan-400/10 text-cyan-300 border border-cyan-400/20'
-                                : 'text-slate-300 hover:text-slate-100 hover:bg-white/[0.03] border border-transparent'
+                                : 'text-slate-300 hover:text-slate-100 hover:bg-white/[0.03] active:bg-white/[0.06] border border-transparent'
                             }`}
                           >
                             {info.nameCn}
@@ -242,7 +245,7 @@ function InfoTab() {
             {bone.romData.map((rom, i) => (
               <div key={i} className="flex items-center justify-between text-[11px]">
                 <span className="text-slate-300">{rom.movement}</span>
-                <span className="font-mono text-cyan-300">{rom.range}</span>
+                <span className="font-mono text-cyan-400">{rom.range}</span>
               </div>
             ))}
           </div>
@@ -261,9 +264,14 @@ function InfoTab() {
 }
 
 // ============================================================
-// Muscle Controls - Reusable muscle mode settings
+// Muscle Controls - Shared component
 // ============================================================
-function MuscleControls({ muscleMode, muscleOpacity, onToggle, onOpacityChange }: {
+function MuscleControls({
+  muscleMode,
+  muscleOpacity,
+  onToggle,
+  onOpacityChange,
+}: {
   muscleMode: boolean;
   muscleOpacity: number;
   onToggle: () => void;
@@ -273,18 +281,18 @@ function MuscleControls({ muscleMode, muscleOpacity, onToggle, onOpacityChange }
     <div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/5">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-1.5">
-          <Heart size={12} className={muscleMode ? 'text-red-400' : 'text-slate-500'} />
-          <span className="text-[11px] font-medium text-slate-200">肌肉层</span>
+          <Heart size={12} className={muscleMode ? 'text-red-400' : 'text-slate-400'} />
+          <span className="text-[11px] text-slate-200">肌肉层</span>
         </div>
         <button
           onClick={onToggle}
-          className={`text-[9px] px-2 py-0.5 rounded-md transition-colors ${
-            muscleMode
-              ? 'bg-red-400/15 text-red-300 border border-red-400/20'
-              : 'bg-white/5 text-slate-400 border border-white/5'
+          className={`w-9 h-5 rounded-full transition-all duration-200 relative ${
+            muscleMode ? 'bg-red-400/30' : 'bg-white/10'
           }`}
         >
-          {muscleMode ? '已开启' : '关闭'}
+          <div className={`absolute top-0.5 w-4 h-4 rounded-full transition-all duration-200 ${
+            muscleMode ? 'left-[18px] bg-red-400' : 'left-0.5 bg-slate-400'
+          }`} />
         </button>
       </div>
       {muscleMode && (
@@ -294,7 +302,7 @@ function MuscleControls({ muscleMode, muscleOpacity, onToggle, onOpacityChange }
             value={[muscleOpacity]}
             onValueChange={([v]) => onOpacityChange(v)}
             min={0.1}
-            max={0.9}
+            max={1}
             step={0.05}
             className="flex-1"
           />
@@ -307,6 +315,7 @@ function MuscleControls({ muscleMode, muscleOpacity, onToggle, onOpacityChange }
 
 // ============================================================
 // Motion Tab - ROM and movement data + animation controls
+// V2.1: Shows motion controls even without selecting a bone first
 // ============================================================
 function MotionTab() {
   const selectedBoneId = useAppStore((s) => s.selectedBoneId);
@@ -318,6 +327,8 @@ function MotionTab() {
   const setJointMotionId = useAppStore((s) => s.setJointMotionId);
   const setJointMotionSpeed = useAppStore((s) => s.setJointMotionSpeed);
   const activeJointPreset = useAppStore((s) => s.activeJointPreset);
+  const setActiveJointPreset = useAppStore((s) => s.setActiveJointPreset);
+  const setCameraPreset = useAppStore((s) => s.setCameraPreset);
 
   // Find available motions for the active joint
   const availableMotions = useMemo(() => {
@@ -325,14 +336,39 @@ function MotionTab() {
     return JOINT_MOTION_DATA.filter(m => m.jointId === activeJointPreset);
   }, [activeJointPreset]);
 
+  // If no joint selected and no bone selected, show quick joint selector
   if (!bone && !activeJointPreset) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-center px-6 py-12">
-        <div className="w-12 h-12 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-center mb-3">
-          <Activity size={20} className="text-slate-500" />
+      <div className="px-3 space-y-3 overflow-y-auto scrollbar-thin">
+        <div className="flex flex-col items-center text-center px-4 py-6">
+          <div className="w-12 h-12 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-center mb-3">
+            <Activity size={20} className="text-slate-500" />
+          </div>
+          <p className="text-[12px] text-slate-300">选择关节查看运动动画</p>
+          <p className="text-[11px] text-slate-400 mt-1">点击下方关节快速开始</p>
         </div>
-        <p className="text-[12px] text-slate-300">选择骨骼或关节查看运动数据</p>
-        <p className="text-[11px] text-slate-400 mt-1">包含关节活动度 (ROM) 和运动动画</p>
+
+        {/* Quick joint selector for motion - so users don't need to go to Joints tab first */}
+        <div className="space-y-2">
+          <div className="text-[9px] font-mono text-slate-500 uppercase tracking-wider px-1">快速选择关节</div>
+          <div className="grid grid-cols-2 gap-1.5">
+            {JOINT_PRESETS.map((joint) => (
+              <button
+                key={joint.id}
+                onClick={() => {
+                  setActiveJointPreset(joint.id);
+                  setCameraPreset(joint.cameraPosition, joint.cameraTarget);
+                }}
+                className="p-2.5 rounded-lg border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] active:bg-white/[0.06] hover:border-white/8 text-left transition-all duration-200"
+              >
+                <div className="flex items-center gap-1.5">
+                  <Bone size={11} className="text-slate-400" />
+                  <span className="text-[11px] font-medium text-slate-200">{joint.nameCn}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -351,46 +387,46 @@ function MotionTab() {
 
           {/* Motion type selector */}
           <div className="space-y-1.5">
-            {availableMotions.map((motion) => {
-              const isActive = jointMotionId === motion.id;
+            {availableMotions.map((m) => {
+              const isActive = jointMotionId === m.id;
               return (
                 <button
-                  key={motion.id}
+                  key={m.id}
                   onClick={() => {
                     if (isActive) {
                       setJointMotionId(null);
                       setJointMotionPlaying(false);
                     } else {
-                      setJointMotionId(motion.id);
+                      setJointMotionId(m.id);
                       setJointMotionPlaying(true);
                     }
                   }}
-                  className={`w-full text-left p-2.5 rounded-lg border transition-all duration-200 ${
+                  className={`w-full text-left p-3 rounded-lg border transition-all duration-200 ${
                     isActive
                       ? 'border-cyan-400/30 bg-cyan-400/8'
-                      : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/8'
+                      : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.04] active:bg-white/[0.06] hover:border-white/8'
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       {isActive && jointMotionPlaying ? (
-                        <div className="w-5 h-5 rounded-md bg-cyan-400/15 flex items-center justify-center">
-                          <Pause size={10} className="text-cyan-400" />
+                        <div className="w-6 h-6 rounded-md bg-cyan-400/15 flex items-center justify-center">
+                          <Pause size={12} className="text-cyan-400" />
                         </div>
                       ) : (
-                        <div className="w-5 h-5 rounded-md bg-white/5 flex items-center justify-center">
-                          <Play size={10} className={isActive ? 'text-cyan-400' : 'text-slate-400'} />
+                        <div className="w-6 h-6 rounded-md bg-white/5 flex items-center justify-center">
+                          <Play size={12} className={isActive ? 'text-cyan-400' : 'text-slate-400'} />
                         </div>
                       )}
                       <div>
                         <div className={`text-[12px] font-medium ${isActive ? 'text-cyan-300' : 'text-slate-200'}`}>
-                          {motion.nameCn}
+                          {m.nameCn}
                         </div>
-                        <div className="text-[9px] font-mono text-slate-500">{motion.nameEn}</div>
+                        <div className="text-[9px] font-mono text-slate-500">{m.nameEn}</div>
                       </div>
                     </div>
                     <span className="text-[10px] font-mono text-slate-400">
-                      {motion.rangeMin}° ~ {motion.rangeMax}°
+                      {m.rangeMin}° ~ {m.rangeMax}°
                     </span>
                   </div>
                 </button>
@@ -405,33 +441,33 @@ function MotionTab() {
               animate={{ height: 'auto', opacity: 1 }}
               className="overflow-hidden"
             >
-              <div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/5 space-y-2">
+              <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-slate-400">播放控制</span>
-                  <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-slate-300 font-medium">播放控制</span>
+                  <div className="flex items-center gap-2">
                     <button
                       onClick={() => setJointMotionPlaying(!jointMotionPlaying)}
-                      className={`w-7 h-7 rounded-md flex items-center justify-center transition-all ${
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
                         jointMotionPlaying
                           ? 'bg-cyan-400/15 text-cyan-400 border border-cyan-400/25'
-                          : 'bg-white/5 text-slate-300 border border-white/8'
+                          : 'bg-white/5 text-slate-300 border border-white/8 active:bg-white/10'
                       }`}
                     >
-                      {jointMotionPlaying ? <Pause size={12} /> : <Play size={12} />}
+                      {jointMotionPlaying ? <Pause size={14} /> : <Play size={14} />}
                     </button>
                     <button
                       onClick={() => {
                         setJointMotionId(null);
                         setJointMotionPlaying(false);
                       }}
-                      className="w-7 h-7 rounded-md bg-white/5 border border-white/8 flex items-center justify-center text-slate-300 hover:text-slate-100 transition-colors"
+                      className="w-8 h-8 rounded-lg bg-white/5 border border-white/8 flex items-center justify-center text-slate-300 active:bg-white/10 transition-colors"
                     >
-                      <RotateCcw size={12} />
+                      <RotateCcw size={14} />
                     </button>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[9px] text-slate-400 w-8">慢</span>
+                  <span className="text-[10px] text-slate-400 w-8">慢</span>
                   <Slider
                     value={[jointMotionSpeed]}
                     onValueChange={([v]) => setJointMotionSpeed(v)}
@@ -440,7 +476,7 @@ function MotionTab() {
                     step={0.1}
                     className="flex-1"
                   />
-                  <span className="text-[9px] text-slate-400 w-8 text-right">快</span>
+                  <span className="text-[10px] text-slate-400 w-8 text-right">快</span>
                 </div>
               </div>
             </motion.div>
@@ -448,10 +484,17 @@ function MotionTab() {
         </div>
       )}
 
+      {/* If joint is active but no motions (shouldn't happen but fallback) */}
+      {activeJointPreset && availableMotions.length === 0 && (
+        <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5 text-center">
+          <p className="text-[11px] text-slate-400">该关节暂无运动动画数据</p>
+        </div>
+      )}
+
       {/* Bone-specific ROM data */}
       {bone && (
         <>
-          <div className="px-1">
+          <div className="px-1 pt-2 border-t border-white/5">
             <h3 className="text-[14px] font-semibold text-white">{bone.nameCn}</h3>
             <p className="text-[10px] text-slate-400 mt-0.5">运动学数据</p>
           </div>
@@ -544,7 +587,7 @@ function PathologyTab() {
                 className={`w-full text-left p-3 rounded-lg border transition-all duration-200 ${
                   isActive
                     ? 'border-red-400/30 bg-red-400/8'
-                    : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/8'
+                    : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.04] active:bg-white/[0.06] hover:border-white/8'
                 }`}
               >
                 <div className="flex items-start justify-between gap-2">
@@ -585,7 +628,7 @@ function PathologyTab() {
 }
 
 // ============================================================
-// Joints Tab - V2.0 Joint view presets with motion toggle
+// Joints Tab - V2.1 Joint view presets with direct motion toggle
 // ============================================================
 function JointsTab() {
   const activeJointPreset = useAppStore((s) => s.activeJointPreset);
@@ -594,6 +637,8 @@ function JointsTab() {
   const selectBone = useAppStore((s) => s.selectBone);
   const lockRegion = useAppStore((s) => s.lockRegion);
   const setActiveTab = useAppStore((s) => s.setActiveTab);
+  const setJointMotionId = useAppStore((s) => s.setJointMotionId);
+  const setJointMotionPlaying = useAppStore((s) => s.setJointMotionPlaying);
 
   const handleJointClick = (preset: typeof JOINT_PRESETS[0]) => {
     const isActive = activeJointPreset === preset.id;
@@ -601,6 +646,8 @@ function JointsTab() {
       setActiveJointPreset(null);
       lockRegion(null);
       selectBone(null);
+      setJointMotionId(null);
+      setJointMotionPlaying(false);
     } else {
       setActiveJointPreset(preset.id);
       setCameraPreset(preset.cameraPosition, preset.cameraTarget);
@@ -618,9 +665,9 @@ function JointsTab() {
   ];
 
   // Check if active joint has motions available
-  const hasMotions = activeJointPreset
-    ? JOINT_MOTION_DATA.some(m => m.jointId === activeJointPreset)
-    : false;
+  const activeMotions = activeJointPreset
+    ? JOINT_MOTION_DATA.filter(m => m.jointId === activeJointPreset)
+    : [];
 
   return (
     <div className="px-3 space-y-3 overflow-y-auto scrollbar-thin">
@@ -642,7 +689,7 @@ function JointsTab() {
                   className={`p-2.5 rounded-lg border text-left transition-all duration-200 ${
                     isActive
                       ? 'border-amber-400/30 bg-amber-400/8'
-                      : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/8'
+                      : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.04] active:bg-white/[0.06] hover:border-white/8'
                   }`}
                 >
                   <div className="flex items-center gap-1.5">
@@ -659,7 +706,7 @@ function JointsTab() {
         </div>
       ))}
 
-      {/* Active joint detail */}
+      {/* Active joint detail + inline motion controls */}
       <AnimatePresence>
         {activeJointPreset && (
           <motion.div
@@ -684,7 +731,7 @@ function JointsTab() {
                         <button
                           key={boneId}
                           onClick={() => selectBone(boneId)}
-                          className="text-[10px] px-2 py-0.5 rounded-md bg-amber-400/8 text-amber-300 border border-amber-400/15 hover:bg-amber-400/15 transition-colors"
+                          className="text-[10px] px-2 py-0.5 rounded-md bg-amber-400/8 text-amber-300 border border-amber-400/15 active:bg-amber-400/15 transition-colors"
                         >
                           {info?.nameCn || boneId}
                         </button>
@@ -692,16 +739,35 @@ function JointsTab() {
                     })}
                   </div>
 
-                  {/* Motion link */}
-                  {hasMotions && (
-                    <button
-                      onClick={() => setActiveTab('motion')}
-                      className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-cyan-400/8 border border-cyan-400/20 text-cyan-300 text-[11px] font-medium hover:bg-cyan-400/12 transition-colors"
-                    >
-                      <Play size={12} />
-                      查看运动动画
-                    </button>
+                  {/* Direct motion controls - no need to switch tabs */}
+                  {activeMotions.length > 0 && (
+                    <div className="pt-2 border-t border-amber-400/10 space-y-1.5">
+                      <div className="text-[9px] font-mono text-slate-500 uppercase tracking-wider">运动动画</div>
+                      {activeMotions.map((m) => (
+                        <button
+                          key={m.id}
+                          onClick={() => {
+                            setJointMotionId(m.id);
+                            setJointMotionPlaying(true);
+                          }}
+                          className="w-full flex items-center gap-2 p-2 rounded-lg bg-cyan-400/5 border border-cyan-400/15 text-left active:bg-cyan-400/10 transition-colors"
+                        >
+                          <Play size={11} className="text-cyan-400 flex-shrink-0" />
+                          <span className="text-[11px] text-cyan-300 font-medium">{m.nameCn}</span>
+                          <span className="text-[9px] font-mono text-slate-500 ml-auto">{m.rangeMin}°~{m.rangeMax}°</span>
+                        </button>
+                      ))}
+                    </div>
                   )}
+
+                  {/* Link to full motion tab */}
+                  <button
+                    onClick={() => setActiveTab('motion')}
+                    className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-cyan-400/8 border border-cyan-400/20 text-cyan-300 text-[11px] font-medium active:bg-cyan-400/12 transition-colors"
+                  >
+                    <Activity size={12} />
+                    查看完整运动数据
+                  </button>
                 </div>
               );
             })()}
@@ -713,7 +779,7 @@ function JointsTab() {
 }
 
 // ============================================================
-// Main SidePanel
+// Main SidePanel - V2.1: Better mobile positioning
 // ============================================================
 export default function SidePanel() {
   const sidebarOpen = useAppStore((s) => s.sidebarOpen);
@@ -736,10 +802,13 @@ export default function SidePanel() {
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: 300, opacity: 0 }}
           transition={{ type: 'spring', damping: 25, stiffness: 250 }}
-          className="absolute right-0 top-0 z-30 glass-strong border-l border-white/5 flex flex-col w-[85vw] sm:w-[320px] h-[60vh] sm:h-full bottom-auto sm:bottom-0 top-auto sm:top-0 rounded-tl-xl sm:rounded-none"
-          style={{
-            bottom: 'env(safe-area-inset-bottom, 56px)',
-          }}
+          className={`absolute right-0 z-30 glass-strong border-l border-white/5 flex flex-col
+            w-[88vw] sm:w-[320px]
+            h-[55vh] sm:h-full
+            bottom-[56px] sm:bottom-0
+            top-auto sm:top-0
+            rounded-t-xl sm:rounded-none
+            border-t sm:border-t-0 border-white/10`}
         >
           {/* Panel header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 flex-shrink-0">
@@ -748,14 +817,14 @@ export default function SidePanel() {
             </h2>
             <button
               onClick={() => setSidebarOpen(false)}
-              className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/8 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-colors"
+              className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/8 active:bg-white/12 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-colors"
             >
               <X size={14} />
             </button>
           </div>
 
           {/* Tab content */}
-          <div className="flex-1 overflow-hidden py-3">
+          <div className="flex-1 overflow-y-auto py-3">
             {activeTab === 'hierarchy' && <HierarchyTab />}
             {activeTab === 'info' && <InfoTab />}
             {activeTab === 'motion' && <MotionTab />}
