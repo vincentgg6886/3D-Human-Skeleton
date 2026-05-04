@@ -298,16 +298,35 @@ function InteractiveBone({ geometry, appBoneId, region, isMirror }: InteractiveB
 }
 
 // ============================================================
-// Muscle Mesh - Semi-transparent muscle overlay
+// Muscle Mesh - Semi-transparent muscle overlay with joint motion following
+// V2.4: Muscles follow skeletal joint motion via muscle group -> bone mapping
 // ============================================================
+
+// Map muscle groups to which joint motions they should follow
+// This determines which muscles move when a joint animates
+const MUSCLE_GROUP_MOTION_BONES: Record<string, string[]> = {
+  // Upper limb muscles follow arm bones
+  'shoulder': ['humerus-right', 'humerus-left'],
+  'arm': ['humerus-right', 'humerus-left', 'radius-right', 'radius-left', 'ulna-right', 'ulna-left'],
+  'forearm': ['radius-right', 'radius-left', 'ulna-right', 'ulna-left'],
+  'hand': ['scaphoid-right', 'scaphoid-left', 'metacarpal-1-right', 'metacarpal-1-left'],
+  // Lower limb muscles follow leg bones
+  'hip': ['femur-right', 'femur-left'],
+  'thigh': ['femur-right', 'femur-left', 'tibia-right', 'tibia-left'],
+  'leg': ['tibia-right', 'tibia-left', 'fibula-right', 'fibula-left'],
+  'foot': ['talus-right', 'talus-left', 'calcaneus-right', 'calcaneus-left'],
+};
+
 interface MuscleMeshProps {
   geometry: THREE.BufferGeometry;
   groupColor: string;
   isMirror: boolean;
+  muscleGroup: string;
 }
 
-function MuscleMesh({ geometry, groupColor, isMirror }: MuscleMeshProps) {
+function MuscleMesh({ geometry, groupColor, isMirror, muscleGroup }: MuscleMeshProps) {
   const meshRef = useRef<THREE.Mesh>(null);
+  const pivotGroupRef = useRef<THREE.Group>(null);
   const muscleMode = useAppStore((s) => s.muscleMode);
   const muscleOpacity = useAppStore((s) => s.muscleOpacity);
   const fadeRef = useRef(0);
@@ -326,15 +345,6 @@ function MuscleMesh({ geometry, groupColor, isMirror }: MuscleMeshProps) {
     });
   }, [groupColor]);
 
-  useFrame(() => {
-    if (!meshRef.current) return;
-    const mat = meshRef.current.material as THREE.MeshStandardMaterial;
-    const targetOpacity = muscleMode ? muscleOpacity : 0;
-    fadeRef.current = THREE.MathUtils.lerp(fadeRef.current, targetOpacity, 0.06);
-    mat.opacity = fadeRef.current;
-    meshRef.current.visible = fadeRef.current > 0.01;
-  });
-
   const meshPosition: [number, number, number] = isMirror
     ? [2 * MODEL_OFFSET_X, MODEL_OFFSET_Y, MODEL_OFFSET_Z]
     : [MODEL_OFFSET_X, MODEL_OFFSET_Y, MODEL_OFFSET_Z];
@@ -343,16 +353,73 @@ function MuscleMesh({ geometry, groupColor, isMirror }: MuscleMeshProps) {
     ? [-MODEL_SCALE, MODEL_SCALE, MODEL_SCALE]
     : [MODEL_SCALE, MODEL_SCALE, MODEL_SCALE];
 
+  useFrame(() => {
+    if (!meshRef.current) return;
+    const mat = meshRef.current.material as THREE.MeshStandardMaterial;
+    const targetOpacity = muscleMode ? muscleOpacity : 0;
+    fadeRef.current = THREE.MathUtils.lerp(fadeRef.current, targetOpacity, 0.06);
+    mat.opacity = fadeRef.current;
+    meshRef.current.visible = fadeRef.current > 0.01;
+
+    // V2.4: Follow joint motion if this muscle group is associated with moving bones
+    if (pivotGroupRef.current) {
+      const motionData = (window as any).__jointMotionData as {
+        angleRad: number;
+        axis: 'x' | 'y' | 'z';
+        pivotPoint: [number, number, number];
+        movingBones: Set<string>;
+      } | null;
+
+      // Check if any of this muscle group's associated bones are in the motion set
+      const associatedBones = MUSCLE_GROUP_MOTION_BONES[muscleGroup] || [];
+      const shouldFollow = motionData && associatedBones.some(b => motionData.movingBones.has(b));
+
+      if (shouldFollow && motionData) {
+        const [px, py, pz] = motionData.pivotPoint;
+        const angle = motionData.angleRad;
+
+        pivotGroupRef.current.position.x = THREE.MathUtils.lerp(pivotGroupRef.current.position.x, px, 0.15);
+        pivotGroupRef.current.position.y = THREE.MathUtils.lerp(pivotGroupRef.current.position.y, py, 0.15);
+        pivotGroupRef.current.position.z = THREE.MathUtils.lerp(pivotGroupRef.current.position.z, pz, 0.15);
+
+        const targetRotX = motionData.axis === 'x' ? angle : 0;
+        const targetRotY = motionData.axis === 'y' ? angle : 0;
+        const targetRotZ = motionData.axis === 'z' ? angle : 0;
+        pivotGroupRef.current.rotation.x = THREE.MathUtils.lerp(pivotGroupRef.current.rotation.x, targetRotX, 0.15);
+        pivotGroupRef.current.rotation.y = THREE.MathUtils.lerp(pivotGroupRef.current.rotation.y, targetRotY, 0.15);
+        pivotGroupRef.current.rotation.z = THREE.MathUtils.lerp(pivotGroupRef.current.rotation.z, targetRotZ, 0.15);
+
+        meshRef.current.position.x = THREE.MathUtils.lerp(meshRef.current.position.x, meshPosition[0] - px, 0.15);
+        meshRef.current.position.y = THREE.MathUtils.lerp(meshRef.current.position.y, meshPosition[1] - py, 0.15);
+        meshRef.current.position.z = THREE.MathUtils.lerp(meshRef.current.position.z, meshPosition[2] - pz, 0.15);
+      } else {
+        // Return to rest
+        pivotGroupRef.current.position.x = THREE.MathUtils.lerp(pivotGroupRef.current.position.x, 0, 0.1);
+        pivotGroupRef.current.position.y = THREE.MathUtils.lerp(pivotGroupRef.current.position.y, 0, 0.1);
+        pivotGroupRef.current.position.z = THREE.MathUtils.lerp(pivotGroupRef.current.position.z, 0, 0.1);
+        pivotGroupRef.current.rotation.x = THREE.MathUtils.lerp(pivotGroupRef.current.rotation.x, 0, 0.1);
+        pivotGroupRef.current.rotation.y = THREE.MathUtils.lerp(pivotGroupRef.current.rotation.y, 0, 0.1);
+        pivotGroupRef.current.rotation.z = THREE.MathUtils.lerp(pivotGroupRef.current.rotation.z, 0, 0.1);
+
+        meshRef.current.position.x = THREE.MathUtils.lerp(meshRef.current.position.x, meshPosition[0], 0.1);
+        meshRef.current.position.y = THREE.MathUtils.lerp(meshRef.current.position.y, meshPosition[1], 0.1);
+        meshRef.current.position.z = THREE.MathUtils.lerp(meshRef.current.position.z, meshPosition[2], 0.1);
+      }
+    }
+  });
+
   return (
-    <mesh
-      ref={meshRef}
-      geometry={geometry}
-      material={material}
-      position={meshPosition}
-      scale={meshScale}
-      visible={false}
-      renderOrder={1}
-    />
+    <group ref={pivotGroupRef}>
+      <mesh
+        ref={meshRef}
+        geometry={geometry}
+        material={material}
+        position={meshPosition}
+        scale={meshScale}
+        visible={false}
+        renderOrder={1}
+      />
+    </group>
   );
 }
 
@@ -577,7 +644,7 @@ function MuscleOverlay() {
   const { scene: lowerScene } = useGLTF(LOWER_LIMB_URL);
 
   const muscles = useMemo(() => {
-    const result: { geometry: THREE.BufferGeometry; groupColor: string; isMirror: boolean; nodeName: string }[] = [];
+    const result: { geometry: THREE.BufferGeometry; groupColor: string; isMirror: boolean; nodeName: string; muscleGroup: string }[] = [];
 
     const processScene = (scene: THREE.Group) => {
       scene.traverse((child) => {
@@ -590,9 +657,9 @@ function MuscleOverlay() {
         const color = MUSCLE_GROUP_COLORS[group];
         const geo = child.geometry;
 
-        result.push({ geometry: geo, groupColor: color, isMirror: false, nodeName: originalName });
+        result.push({ geometry: geo, groupColor: color, isMirror: false, nodeName: originalName, muscleGroup: group });
         if (rawName.endsWith('r') || originalName.endsWith('.r') || originalName.endsWith('.r.')) {
-          result.push({ geometry: geo, groupColor: color, isMirror: true, nodeName: originalName + '_L' });
+          result.push({ geometry: geo, groupColor: color, isMirror: true, nodeName: originalName + '_L', muscleGroup: group });
         }
       });
     };
@@ -604,8 +671,8 @@ function MuscleOverlay() {
 
   return (
     <group>
-      {muscles.map(({ geometry, groupColor, isMirror, nodeName }, i) => (
-        <MuscleMesh key={`${nodeName}-${i}`} geometry={geometry} groupColor={groupColor} isMirror={isMirror} />
+      {muscles.map(({ geometry, groupColor, isMirror, nodeName, muscleGroup }, i) => (
+        <MuscleMesh key={`${nodeName}-${i}`} geometry={geometry} groupColor={groupColor} isMirror={isMirror} muscleGroup={muscleGroup} />
       ))}
     </group>
   );
@@ -776,8 +843,9 @@ function FloorGrid() {
 }
 
 // ============================================================
-// V2.2: Joint Motion Animator - Anatomically correct pivot-based rotation
-// Uses matrix transforms to rotate bones around the actual joint pivot point
+// V2.4: Joint Motion Animator - Anatomically correct pivot-based rotation
+// Pivot = proximal end (top/Y-max) of the pivotBone = the joint surface
+// All movingBones rotate around this pivot point
 // ============================================================
 function JointMotionAnimator() {
   const jointMotionId = useAppStore((s) => s.jointMotionId);
@@ -805,48 +873,32 @@ function JointMotionAnimator() {
       return;
     }
 
-    // V2.3: Get bone bounding box data for accurate joint pivot calculation
+    // V2.4: Get bone bounding box data for accurate joint pivot calculation
     const boneBounds = (window as any).__boneBounds as Record<string, { min: [number, number, number]; max: [number, number, number]; center: [number, number, number] }> | null;
     if (!boneBounds) {
       (window as any).__jointMotionData = null;
       return;
     }
 
-    const pivotBounds = boneBounds[motion.pivotBone];
-    const movingBounds = boneBounds[motion.movingBones[0]];
-    if (!pivotBounds || !movingBounds) {
+    const pivotBoneBounds = boneBounds[motion.pivotBone];
+    if (!pivotBoneBounds) {
       (window as any).__jointMotionData = null;
       return;
     }
 
-    // V2.3: Calculate the joint pivot point using the ENDPOINT of the pivot bone
-    // that is closest to the moving bone, NOT the geometric center.
-    // 
-    // For long bones oriented vertically (Y axis):
-    //   'distal' = lower end (min Y) for upper limb bones, or the end closer to the moving bone
-    //   'proximal' = upper end (max Y), closer to the body center
+    // V2.4: NEW PIVOT STRATEGY
+    // The pivotBone IS the first bone that moves (e.g., humerus for shoulder).
+    // The joint surface is at the PROXIMAL end (top, Y-max) of this bone.
+    // This is where the bone connects to the body - the humeral head, femoral head, etc.
     //
-    // Strategy: find which endpoint of the pivot bone's bounding box is closest
-    // to the moving bone's center. That endpoint IS the joint surface.
-    const pivotMin = pivotBounds.min;
-    const pivotMax = pivotBounds.max;
-    const movingCenter = movingBounds.center;
-
-    // Test both Y-endpoints of the pivot bone to find which is closer to the moving bone
-    // Use the X,Z of the pivot center (joint is roughly along the bone's long axis)
-    const pivotCx = pivotBounds.center[0];
-    const pivotCz = pivotBounds.center[2];
-
-    // Bottom endpoint of pivot bone
-    const bottomEnd: [number, number, number] = [pivotCx, pivotMin[1], pivotCz];
-    // Top endpoint of pivot bone  
-    const topEnd: [number, number, number] = [pivotCx, pivotMax[1], pivotCz];
-
-    const distBottom = Math.abs(bottomEnd[1] - movingCenter[1]) + Math.abs(bottomEnd[0] - movingCenter[0]) * 0.3;
-    const distTop = Math.abs(topEnd[1] - movingCenter[1]) + Math.abs(topEnd[0] - movingCenter[0]) * 0.3;
-
-    // The joint pivot is the endpoint of the pivot bone closest to the moving bone
-    const pivotPoint: [number, number, number] = distBottom < distTop ? bottomEnd : topEnd;
+    // For the proximal end of a long bone:
+    //   - Y-max = top of the bone = closest to body center = joint surface
+    //   - Use the X,Z of the bone's center (the joint is roughly centered on the bone's axis)
+    const pivotPoint: [number, number, number] = [
+      pivotBoneBounds.center[0],
+      pivotBoneBounds.max[1],  // proximal end = Y maximum = joint surface
+      pivotBoneBounds.center[2],
+    ];
 
     timeRef.current += delta * jointMotionSpeed;
 
@@ -855,7 +907,7 @@ function JointMotionAnimator() {
     const angleDeg = t * motion.visualRange;
     const angleRad = THREE.MathUtils.degToRad(angleDeg);
 
-    // Set global data for InteractiveBone to read
+    // Set global data for InteractiveBone AND MuscleMesh to read
     (window as any).__jointMotionData = {
       angleRad,
       axis: motion.axis,
