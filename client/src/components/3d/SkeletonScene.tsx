@@ -18,11 +18,24 @@ import { JOINT_PRESET_MAP } from '@/lib/jointPresets';
 import { JOINT_MOTION_MAP } from '@/lib/jointMotionData';
 
 // 3D模型文件路径配置
-// 开源用户：使用CDN链接，clone后直接可用，无需下载模型文件
-// 如需本地加载，可下载模型到 client/public/models/ 并修改下方URL
-const SKELETON_URL = import.meta.env.VITE_MODEL_SKELETON_URL || 'https://files.manuscdn.com/user_upload_by_module/session_file/309927823320059311/epVUqpsgLWVopkIp.glb';
-const UPPER_LIMB_URL = import.meta.env.VITE_MODEL_UPPER_LIMB_URL || 'https://files.manuscdn.com/user_upload_by_module/session_file/309927823320059311/xwWkauHOLzTDtXlV.glb';
-const LOWER_LIMB_URL = import.meta.env.VITE_MODEL_LOWER_LIMB_URL || 'https://files.manuscdn.com/user_upload_by_module/session_file/309927823320059311/wsxpywvAewBtjRND.glb';
+// Manus平台部署：使用平台存储路径（/manus-storage/...）
+// 开源用户：通过环境变量VITE_MODEL_*指向自定义路径，或使用CDN链接
+const CDN_SKELETON = 'https://files.manuscdn.com/user_upload_by_module/session_file/309927823320059311/epVUqpsgLWVopkIp.glb';
+const CDN_UPPER_LIMB = 'https://files.manuscdn.com/user_upload_by_module/session_file/309927823320059311/xwWkauHOLzTDtXlV.glb';
+const CDN_LOWER_LIMB = 'https://files.manuscdn.com/user_upload_by_module/session_file/309927823320059311/wsxpywvAewBtjRND.glb';
+
+const MANUS_SKELETON = '/manus-storage/overview-skeleton_6ea5e566.glb';
+const MANUS_UPPER_LIMB = '/manus-storage/upper-limb_6bf73f41.glb';
+const MANUS_LOWER_LIMB = '/manus-storage/lower-limb_f4a22f68.glb';
+// Legacy paths (verified working in previous deployments):
+// '/manus-storage/overview-skeleton_8b0752cc.glb'
+// '/manus-storage/upper-limb_1ff7cbc0.glb'
+// '/manus-storage/lower-limb_931f932f.glb'
+
+// 优先级：环境变量 > Manus平台存储 > CDN
+const SKELETON_URL = import.meta.env.VITE_MODEL_SKELETON_URL || MANUS_SKELETON || CDN_SKELETON;
+const UPPER_LIMB_URL = import.meta.env.VITE_MODEL_UPPER_LIMB_URL || MANUS_UPPER_LIMB || CDN_UPPER_LIMB;
+const LOWER_LIMB_URL = import.meta.env.VITE_MODEL_LOWER_LIMB_URL || MANUS_LOWER_LIMB || CDN_LOWER_LIMB;
 
 const MODEL_SCALE = 4.7;
 const MODEL_OFFSET_X = 0.13 * MODEL_SCALE;
