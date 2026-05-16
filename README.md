@@ -79,22 +79,23 @@ OrthoVis 3D 是一个基于 WebGL 的人体骨骼3D交互可视化系统，支�
 
 - Node.js >= 18
 - pnpm >= 8
+- 支持 WebGL 2.0 的现代浏览器（Chrome / Edge / Firefox）
 
-### 安装与运行
+### 一键部署
 
 ```bash
-# 克隆仓库
+# 1. 克隆仓库
 git clone https://github.com/vincentgg6886/3D-Human-Skeleton.git
 cd 3D-Human-Skeleton
 
-# 安装依赖
+# 2. 安装依赖
 pnpm install
 
-# 启动开发服务器
+# 3. 启动开发服务器
 pnpm dev
 ```
 
-打开浏览器访问 `http://localhost:3000` 即可使用。
+打开浏览器访问 `http://localhost:3000` 即可使用。无需任何额外配置或API密钥。
 
 ### 构建生产版本
 
@@ -102,7 +103,29 @@ pnpm dev
 pnpm build
 ```
 
-构建产物输出到 `dist/` 目录。
+构建产物输出到 `dist/` 目录，可直接部署到任何静态托管服务。
+
+### 部署到各平台
+
+| 平台 | 方式 |
+|------|------|
+| Vercel | 导入 GitHub 仓库，框架选 Vite，根目录设为 `client` |
+| Netlify | 连接仓库，Build command: `pnpm build`，Publish: `dist` |
+| GitHub Pages | 使用 `gh-pages` 分支部署 `dist` 目录 |
+| Docker | 使用 nginx 镜像挂载 `dist` 目录 |
+| 本地局域网 | `pnpm build && npx serve dist` |
+
+### 3D 模型文件
+
+模型文件通过 CDN 加载，无需手动下载，clone 后直接运行即可。
+
+| 模型 | 大小 | 说明 |
+|------|------|------|
+| overview-skeleton.glb | 3.3 MB | 主骨架模型（147块骨骼） |
+| upper-limb.glb | 6.6 MB | 上肢肌肉模型（44块肌肉） |
+| lower-limb.glb | 5.9 MB | 下肢肌肉模型（53块肌肉） |
+
+模型基于开放医学教育资源，采用 GLB 格式（glTF Binary）。如需本地加载，可下载模型放到 `client/public/models/` 目录并修改 `SkeletonScene.tsx` 中的 URL 为本地路径。
 
 ## 技术栈
 

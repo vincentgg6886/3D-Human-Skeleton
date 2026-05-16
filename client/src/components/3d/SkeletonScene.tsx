@@ -17,9 +17,11 @@ import { isMuscleNode, getMuscleGroup, MUSCLE_GROUP_COLORS } from '@/lib/muscleF
 import { JOINT_PRESET_MAP } from '@/lib/jointPresets';
 import { JOINT_MOTION_MAP } from '@/lib/jointMotionData';
 
-const SKELETON_URL = '/manus-storage/overview-skeleton_8b0752cc.glb';
-const UPPER_LIMB_URL = '/manus-storage/upper-limb_1ff7cbc0.glb';
-const LOWER_LIMB_URL = '/manus-storage/lower-limb_931f932f.glb';
+// 3D模型文件 - 使用CDN链接确保clone后直接可用
+// 如需本地加载，可下载模型到 client/public/models/ 并修改为本地路径
+const SKELETON_URL = 'https://files.manuscdn.com/user_upload_by_module/session_file/309927823320059311/epVUqpsgLWVopkIp.glb';
+const UPPER_LIMB_URL = 'https://files.manuscdn.com/user_upload_by_module/session_file/309927823320059311/xwWkauHOLzTDtXlV.glb';
+const LOWER_LIMB_URL = 'https://files.manuscdn.com/user_upload_by_module/session_file/309927823320059311/wsxpywvAewBtjRND.glb';
 
 const MODEL_SCALE = 4.7;
 const MODEL_OFFSET_X = 0.13 * MODEL_SCALE;
