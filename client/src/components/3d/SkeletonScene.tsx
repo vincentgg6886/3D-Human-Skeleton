@@ -17,11 +17,12 @@ import { isMuscleNode, getMuscleGroup, MUSCLE_GROUP_COLORS } from '@/lib/muscleF
 import { JOINT_PRESET_MAP } from '@/lib/jointPresets';
 import { JOINT_MOTION_MAP } from '@/lib/jointMotionData';
 
-// 3D模型文件 - 使用CDN链接确保clone后直接可用
-// 如需本地加载，可下载模型到 client/public/models/ 并修改为本地路径
-const SKELETON_URL = 'https://files.manuscdn.com/user_upload_by_module/session_file/309927823320059311/epVUqpsgLWVopkIp.glb';
-const UPPER_LIMB_URL = 'https://files.manuscdn.com/user_upload_by_module/session_file/309927823320059311/xwWkauHOLzTDtXlV.glb';
-const LOWER_LIMB_URL = 'https://files.manuscdn.com/user_upload_by_module/session_file/309927823320059311/wsxpywvAewBtjRND.glb';
+// 3D模型文件路径配置
+// 开源用户：使用CDN链接，clone后直接可用，无需下载模型文件
+// 如需本地加载，可下载模型到 client/public/models/ 并修改下方URL
+const SKELETON_URL = import.meta.env.VITE_MODEL_SKELETON_URL || 'https://files.manuscdn.com/user_upload_by_module/session_file/309927823320059311/epVUqpsgLWVopkIp.glb';
+const UPPER_LIMB_URL = import.meta.env.VITE_MODEL_UPPER_LIMB_URL || 'https://files.manuscdn.com/user_upload_by_module/session_file/309927823320059311/xwWkauHOLzTDtXlV.glb';
+const LOWER_LIMB_URL = import.meta.env.VITE_MODEL_LOWER_LIMB_URL || 'https://files.manuscdn.com/user_upload_by_module/session_file/309927823320059311/wsxpywvAewBtjRND.glb';
 
 const MODEL_SCALE = 4.7;
 const MODEL_OFFSET_X = 0.13 * MODEL_SCALE;
@@ -547,7 +548,7 @@ for (const originalName of Object.keys(GLB_NODE_TO_BONE)) {
 }
 
 function SkeletonModel() {
-  const { scene } = useGLTF(SKELETON_URL);
+  const { scene } = useGLTF(SKELETON_URL) as any;
   const setModelLoaded = useAppStore((s) => s.setModelLoaded);
 
   const bones = useMemo(() => {
@@ -556,7 +557,7 @@ function SkeletonModel() {
     // V2.3: Store full bounding box data for accurate joint pivot calculation
     const boneBounds: Record<string, { min: [number, number, number]; max: [number, number, number]; center: [number, number, number] }> = {};
 
-    scene.traverse((child) => {
+    scene.traverse((child: any) => {
       if (!(child instanceof THREE.Mesh)) return;
       const nodeName = child.name;
       const originalName = SANITIZED_LOOKUP[nodeName] || nodeName;
@@ -642,8 +643,8 @@ function SkeletonModel() {
 // Muscle Overlay Loader
 // ============================================================
 function MuscleOverlay() {
-  const { scene: upperScene } = useGLTF(UPPER_LIMB_URL);
-  const { scene: lowerScene } = useGLTF(LOWER_LIMB_URL);
+  const { scene: upperScene } = useGLTF(UPPER_LIMB_URL) as any;
+  const { scene: lowerScene } = useGLTF(LOWER_LIMB_URL) as any;
 
   const muscles = useMemo(() => {
     const result: { geometry: THREE.BufferGeometry; groupColor: string; isMirror: boolean; nodeName: string; muscleGroup: string }[] = [];
